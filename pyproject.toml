@@ -8,7 +8,10 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
+typer = "^0.12.3"
 
+[tool.poetry.scripts]
+ape = "ape.cli:app"
 
 [build-system]
 requires = ["poetry-core"]
