@@ -4,12 +4,7 @@ from typing import Annotated
 import rich.console
 import typer
 
-from ape.llm import (
-    find_answer,
-    no_answer,
-)
-
-from . import errors
+from . import errors, llm
 
 app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
 
@@ -45,7 +40,7 @@ def run(
 
     try:
         with console.status("[bold][blue]Processing ...", spinner="monkey"):
-            answer = find_answer(query, model)
+            answer = llm.find_answer(query, model)
     except errors.EmptyQueryError:
         typer.echo("Query cannot be empty.", err=True)
         raise typer.Exit(1)
@@ -59,7 +54,7 @@ def run(
         )
         raise typer.Exit(1)
 
-    if no_answer(answer):
+    if llm.no_answer(answer):
         typer.echo(answer, err=True)
         raise typer.Exit(1)
 
