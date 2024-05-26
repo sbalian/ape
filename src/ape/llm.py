@@ -1,8 +1,4 @@
-import os
-
 import openai
-
-from . import errors
 
 SYSTEM_PROMPT = """\
 You are a Linux command assistant. You will be asked a question about how to perform a task in Linux or Unix-like operating systems. You should only include in your answer the command or commands to perform the task. If you do not know how to perform the task, output "Please rephrase.".
@@ -29,26 +25,27 @@ Question: {query}
 Answer:"""
 
 
+class EmptyQueryError(ValueError):
+    pass
+
+
 def make_user_prompt(query: str) -> str:
     query = query.strip()
     if query == "":
-        raise errors.EmptyQueryError()
+        raise EmptyQueryError()
     return USER_PROMPT_TEMPLATE.format(query=query)
 
 
 def call_llm(user_prompt: str, model: str, system_prompt: str) -> str | None:
     client = openai.OpenAI()
 
-    try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-        )
-    except openai.NotFoundError:
-        raise errors.ModelNotFoundError()
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
 
     answer = response.choices[0].message.content
     return answer
@@ -56,9 +53,6 @@ def call_llm(user_prompt: str, model: str, system_prompt: str) -> str | None:
 
 def find_answer(query: str, model: str) -> str:
     user_prompt = make_user_prompt(query)
-
-    if os.getenv("OPENAI_API_KEY") is None:
-        raise errors.ApiKeyUnsetError()
 
     answer = call_llm(user_prompt, model, SYSTEM_PROMPT)
 

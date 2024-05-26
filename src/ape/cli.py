@@ -1,10 +1,11 @@
 import subprocess
 from typing import Annotated
 
+import openai
 import rich.console
 import typer
 
-from . import errors, llm
+from . import llm
 
 app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
 
@@ -41,17 +42,16 @@ def run(
     try:
         with console.status("[bold][blue]Processing ...", spinner="monkey"):
             answer = llm.find_answer(query, model)
-    except errors.EmptyQueryError:
+    except llm.EmptyQueryError:
         typer.echo("Query cannot be empty.", err=True)
         raise typer.Exit(1)
-    except errors.ApiKeyUnsetError:
-        typer.echo("Please set the OPENAI_API_KEY environment variable.", err=True)
+    except openai.NotFoundError as e:
+        message = e.response.json()["error"]["message"].rstrip(".")
+        typer.echo(f"OpenAI error: {message}.", err=True)
         raise typer.Exit(1)
-    except errors.ModelNotFoundError:
-        typer.echo(
-            f"Model '{model}' not found. See https://platform.openai.com/docs/models.",
-            err=True,
-        )
+    except openai.OpenAIError as e:
+        message = e.args[0].rstrip(".")
+        typer.echo(f"OpenAI error: {message}.", err=True)
         raise typer.Exit(1)
 
     if llm.no_answer(answer):
