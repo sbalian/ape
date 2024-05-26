@@ -12,7 +12,7 @@ Answer:"""
 
 
 def test_make_user_prompt_raises_for_empty_query():
-    with pytest.raises(ValueError):
+    with pytest.raises(llm.EmptyQueryError):
         llm.make_user_prompt(" ")
 
 
