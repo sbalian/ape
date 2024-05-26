@@ -36,19 +36,14 @@ def make_user_prompt(query: str) -> str:
     return USER_PROMPT_TEMPLATE.format(query=query)
 
 
-def find_answer(query: str, model: str) -> str:
-    user_prompt = make_user_prompt(query)
-
-    if os.getenv("OPENAI_API_KEY") is None:
-        raise errors.ApiKeyUnsetError()
-
+def call_llm(user_prompt: str, model: str, system_prompt: str) -> str | None:
     client = openai.OpenAI()
 
     try:
         response = client.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
         )
@@ -56,6 +51,17 @@ def find_answer(query: str, model: str) -> str:
         raise errors.ModelNotFoundError()
 
     answer = response.choices[0].message.content
+    return answer
+
+
+def find_answer(query: str, model: str) -> str:
+    user_prompt = make_user_prompt(query)
+
+    if os.getenv("OPENAI_API_KEY") is None:
+        raise errors.ApiKeyUnsetError()
+
+    answer = call_llm(user_prompt, model, SYSTEM_PROMPT)
+
     if answer is None:
         return "Please rephrase."
     else:
