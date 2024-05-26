@@ -4,7 +4,7 @@ from ape import cli, llm
 runner = typer.testing.CliRunner(mix_stderr=False)
 
 
-def test_app_for_suggestion(mockapikey, monkeypatch):
+def test_app_for_suggestion(monkeypatch):
     monkeypatch.setattr("ape.llm.call_llm", lambda *args, **kwargs: "ls")
     result = runner.invoke(cli.app, ["list all the files"])
     assert result.stdout == "ls\n"
@@ -12,7 +12,7 @@ def test_app_for_suggestion(mockapikey, monkeypatch):
     assert result.exit_code == 0
 
 
-def test_app_for_no_suggestion(mockapikey, monkeypatch):
+def test_app_for_no_suggestion(monkeypatch):
     monkeypatch.setattr("ape.llm.call_llm", lambda *args, **kwargs: "Please rephrase.")
     result = runner.invoke(cli.app, ["what is the capital of France?"])
     assert result.stdout == ""
@@ -20,14 +20,14 @@ def test_app_for_no_suggestion(mockapikey, monkeypatch):
     assert result.exit_code == 1
 
 
-def test_app_with_empty_query(mockapikey, monkeypatch):
+def test_app_with_empty_query():
     result = runner.invoke(cli.app, [" "])
     assert result.stdout == ""
     assert result.stderr == "Query cannot be empty.\n"
     assert result.exit_code == 1
 
 
-def test_app_with_no_model(mockapikey, monkeypatch):
+def test_app_with_no_model(monkeypatch):
     def mockreturn(*args, **kwargs):
         raise llm.OpenAIAPIStatusError("model not found", 404)
 
@@ -38,7 +38,8 @@ def test_app_with_no_model(mockapikey, monkeypatch):
     assert result.exit_code == 1
 
 
-def test_app_with_no_api_key(mockapikey, monkeypatch):
+def test_app_with_no_api_key(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "key")
     monkeypatch.delenv("OPENAI_API_KEY")
     result = runner.invoke(cli.app, ["list all the files"])
     assert result.stdout == ""
@@ -46,7 +47,7 @@ def test_app_with_no_api_key(mockapikey, monkeypatch):
     assert result.exit_code == 1
 
 
-def test_app_with_wrong_api_key(mockapikey, monkeypatch):
+def test_app_with_wrong_api_key(monkeypatch):
     def mockreturn(*args, **kwargs):
         raise llm.OpenAIAPIStatusError("wrong api key", 401)
 
@@ -58,7 +59,7 @@ def test_app_with_wrong_api_key(mockapikey, monkeypatch):
     assert result.exit_code == 1
 
 
-def test_app_for_suggestion_with_execute(mockapikey, monkeypatch):
+def test_app_for_suggestion_with_execute(monkeypatch):
     monkeypatch.setattr("ape.llm.call_llm", lambda *args, **kwargs: "ls")
     result = runner.invoke(cli.app, ["list all the files", "--execute"])
     assert result.stdout == "ls\n"  # careful, this will run!
