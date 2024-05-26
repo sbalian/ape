@@ -32,6 +32,7 @@ To run:
 ape "Create a symbolic link called win pointing to /mnt/c/Users/jdoe"
 ape "Delete all the .venv directories under projects/"
 ape "List the contents of the working directory with as much detail as possible"
+ape "Who am I logged in as?"
 ```
 
 For more options:
