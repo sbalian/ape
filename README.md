@@ -38,6 +38,8 @@ Output:
 ln -s /mnt/c/Users/jdoe win
 ```
 
+Another example:
+
 ```bash
 ape "Delete all the .venv directories under projects/"
 ```
