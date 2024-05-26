@@ -50,6 +50,18 @@ Output:
 find projects/ -type d -name ".venv" -exec rm -rf {} +
 ```
 
+If you try to ask something unrelated to Linux commands, you should get "Please rephrase." printed:
+
+```bash
+ape "Tell me about monkeys"
+```
+
+Output:
+
+```text
+Please rephrase.
+```
+
 You can change the model using `--model`. The default is `gpt-4o`.
 See [here](https://platform.openai.com/docs/models) for a list of models. For example:
 
