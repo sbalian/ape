@@ -17,7 +17,7 @@ Currently, only [OpenAI](https://openai.com/api/) is supported.
 To install:
 
 ```bash
-pipx install ape-ai
+pipx install ape-linux
 ```
 
 Next, set your API key:

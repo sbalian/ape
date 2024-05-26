@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "ape-ai"
+name = "ape-linux"
 version = "0.1.0"
 description = "AI for Linux commands"
 license = "MIT"
