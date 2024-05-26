@@ -2,9 +2,22 @@
 name = "ape"
 version = "0.1.0"
 description = "AI for Linux commands"
-authors = ["Seto Balian <seto.balian@gmail.com>"]
 license = "MIT"
+authors = ["Seto Balian <seto.balian@gmail.com>"]
+maintainers = ["Seto Balian <seto.balian@gmail.com>"]
 readme = "README.md"
+homepage = "https://github.com/sbalian/ape"
+repository = "https://github.com/sbalian/ape"
+keywords = ["ai", "llm", "linux", "openai"]
+classifiers = [
+    "Intended Audience :: Developers",
+    "Programming Language :: Python",
+    "Topic :: Software Development",
+    "License :: OSI Approved :: MIT License",
+]
+packages = [
+    { include = "ape", from = "src" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.10"
