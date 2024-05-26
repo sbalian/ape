@@ -29,6 +29,13 @@ class EmptyQueryError(ValueError):
     pass
 
 
+class OpenAIAPIStatusError(Exception):
+    def __init__(self, message: str, status_code: int) -> None:
+        self.message = message
+        self.status_code = status_code
+        super().__init__(self.message, self.status_code)
+
+
 def make_user_prompt(query: str) -> str:
     query = query.strip()
     if query == "":
@@ -39,13 +46,16 @@ def make_user_prompt(query: str) -> str:
 def call_llm(user_prompt: str, model: str, system_prompt: str) -> str | None:
     client = openai.OpenAI()
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-    )
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+    except openai.APIStatusError as e:
+        raise OpenAIAPIStatusError(e.response.json()["error"]["message"], e.status_code)
 
     answer = response.choices[0].message.content
     return answer

@@ -45,14 +45,14 @@ def run(
     except llm.EmptyQueryError:
         typer.echo("Query cannot be empty.", err=True)
         raise typer.Exit(1)
-    except openai.APIStatusError as e:
+    except llm.OpenAIAPIStatusError as e:
         typer.echo(
-            f"OpenAI {e.status_code} error: {e.response.json()['error']['message']}",
+            f"OpenAI {e.status_code} error: {e.message}",
             err=True,
         )
         raise typer.Exit(1)
     except openai.OpenAIError as e:
-        typer.echo(f"OpenAI error: {e}", err=True)
+        typer.echo(f"Generic OpenAI error: {e}", err=True)
         raise typer.Exit(1)
 
     if llm.no_answer(answer):
