@@ -35,6 +35,10 @@ class EmptyQueryError(ValueError):
     pass
 
 
+class ModelNotFoundError(ValueError):
+    pass
+
+
 def make_user_prompt(query: str) -> str:
     query = query.strip()
     if query == "":
@@ -50,13 +54,17 @@ def find_answer(query: str, model: str) -> str:
 
     client = openai.OpenAI()
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
-    )
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+    except openai.NotFoundError:
+        raise ModelNotFoundError()
+
     answer = response.choices[0].message.content
     if answer is None:
         return "Please rephrase."

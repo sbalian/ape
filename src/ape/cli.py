@@ -4,7 +4,13 @@ from typing import Annotated
 import rich.console
 import typer
 
-from ape.llm import ApiKeyUnsetError, EmptyQueryError, find_answer, no_answer
+from ape.llm import (
+    ApiKeyUnsetError,
+    EmptyQueryError,
+    ModelNotFoundError,
+    find_answer,
+    no_answer,
+)
 
 app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
 
@@ -46,6 +52,12 @@ def run(
         raise typer.Exit(1)
     except ApiKeyUnsetError:
         typer.echo("Please set the OPENAI_API_KEY environment variable.", err=True)
+        raise typer.Exit(1)
+    except ModelNotFoundError:
+        typer.echo(
+            f"Model '{model}' not found. See https://platform.openai.com/docs/models.",
+            err=True,
+        )
         raise typer.Exit(1)
 
     if no_answer(answer):
