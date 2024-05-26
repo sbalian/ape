@@ -2,6 +2,8 @@ import os
 
 import openai
 
+from . import errors
+
 SYSTEM_PROMPT = """\
 You are a Linux command assistant. You will be asked a question about how to perform a task in Linux or Unix-like operating systems. You should only include in your answer the command or commands to perform the task. If you do not know how to perform the task, output "Please rephrase.".
 
@@ -27,22 +29,10 @@ Question: {query}
 Answer:"""
 
 
-class ApiKeyUnsetError(ValueError):
-    pass
-
-
-class EmptyQueryError(ValueError):
-    pass
-
-
-class ModelNotFoundError(ValueError):
-    pass
-
-
 def make_user_prompt(query: str) -> str:
     query = query.strip()
     if query == "":
-        raise EmptyQueryError()
+        raise errors.EmptyQueryError()
     return USER_PROMPT_TEMPLATE.format(query=query)
 
 
@@ -50,7 +40,7 @@ def find_answer(query: str, model: str) -> str:
     user_prompt = make_user_prompt(query)
 
     if os.getenv("OPENAI_API_KEY") is None:
-        raise ApiKeyUnsetError()
+        raise errors.ApiKeyUnsetError()
 
     client = openai.OpenAI()
 
@@ -63,7 +53,7 @@ def find_answer(query: str, model: str) -> str:
             ],
         )
     except openai.NotFoundError:
-        raise ModelNotFoundError()
+        raise errors.ModelNotFoundError()
 
     answer = response.choices[0].message.content
     if answer is None:

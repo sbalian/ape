@@ -5,12 +5,11 @@ import rich.console
 import typer
 
 from ape.llm import (
-    ApiKeyUnsetError,
-    EmptyQueryError,
-    ModelNotFoundError,
     find_answer,
     no_answer,
 )
+
+from . import errors
 
 app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
 
@@ -47,13 +46,13 @@ def run(
     try:
         with console.status("[bold][blue]Processing ...", spinner="monkey"):
             answer = find_answer(query, model)
-    except EmptyQueryError:
+    except errors.EmptyQueryError:
         typer.echo("Query cannot be empty.", err=True)
         raise typer.Exit(1)
-    except ApiKeyUnsetError:
+    except errors.ApiKeyUnsetError:
         typer.echo("Please set the OPENAI_API_KEY environment variable.", err=True)
         raise typer.Exit(1)
-    except ModelNotFoundError:
+    except errors.ModelNotFoundError:
         typer.echo(
             f"Model '{model}' not found. See https://platform.openai.com/docs/models.",
             err=True,
