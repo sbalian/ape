@@ -63,7 +63,7 @@ Output:
 ls -lha
 ```
 
-If you pass `--execute`, the tool will run the command for you! Be careful with this as LLMs often make mistakes:
+If you pass `--execute`, the tool will run the command for you after printing it! Be careful with this as LLMs often make mistakes:
 
 ```bash
 ape "Who am I logged in as?"
