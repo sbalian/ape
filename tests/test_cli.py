@@ -12,12 +12,14 @@ def test_app_for_suggestion(monkeypatch):
     assert result.exit_code == 0
 
 
-def test_app_for_no_suggestion(monkeypatch):
-    monkeypatch.setattr("ape.llm.call_llm", lambda *args, **kwargs: "Please rephrase.")
+def test_app_for_try_again(monkeypatch):
+    monkeypatch.setattr(
+        "ape.llm.call_llm", lambda *args, **kwargs: 'echo "Please try again."'
+    )
     result = runner.invoke(cli.app, ["what is the capital of France?"])
-    assert result.stdout == ""
-    assert result.stderr == "Please rephrase.\n"
-    assert result.exit_code == 1
+    assert result.stdout == 'echo "Please try again."\n'
+    assert result.stderr == ""
+    assert result.exit_code == 0
 
 
 def test_app_with_empty_query():
