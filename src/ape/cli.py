@@ -51,10 +51,6 @@ def run(
         typer.echo(f"Generic OpenAI error: {e}", err=True)
         raise typer.Exit(1)
 
-    if llm.no_answer(answer):
-        typer.echo(answer, err=True)
-        raise typer.Exit(1)
-
     typer.echo(answer)
 
     if execute:

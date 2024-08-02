@@ -50,16 +50,16 @@ Output:
 find projects/ -type d -name ".venv" -exec rm -rf {} +
 ```
 
-If you try to ask something unrelated to Linux commands, you should get "Please rephrase." printed:
+If you try to ask something unrelated to Linux commands:
 
 ```bash
 ape "Tell me about monkeys"
 ```
 
-Output:
+you should get:
 
 ```text
-Please rephrase.
+echo "Please try again."
 ```
 
 You can change the model using `--model`. The default is `gpt-4o`.
