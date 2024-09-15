@@ -11,7 +11,9 @@ import typer
 app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
 
 
-def call_llm(api_key: str, model: str, system_prompt: str, user_prompt: str):
+def call_llm(
+    api_key: str, model: str, system_prompt: str, user_prompt: str
+) -> str | None:
     return (
         openai.OpenAI(api_key=api_key)
         .chat.completions.create(
