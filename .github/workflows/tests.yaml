@@ -23,11 +23,11 @@ jobs:
       - name: Install Poetry
         uses: snok/install-poetry@v1
       - name: Install the package (no lockfile)
-        run: rm poetry.lock && poetry install
+        run: install-no-lock
       - name: Run pytest
-        run: poetry run pytest
+        run: make test
       - name: Type check
-        run: poetry run pyright
+        run: make type-check
 
   lint:
     name: Lint
@@ -42,6 +42,6 @@ jobs:
       - name: Install Poetry
         uses: snok/install-poetry@v1
       - name: Install the package
-        run: poetry install
+        run: make install
       - name: Run ruff
-        run: poetry run ruff check
+        run: make lint
