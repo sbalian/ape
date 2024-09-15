@@ -20,10 +20,10 @@ To install:
 pipx install ape-linux
 ```
 
-Next, set your API key:
+Next, set your OpenAI API key:
 
 ```bash
-export OPENAI_API_KEY=key
+export APE_OPENAI_API_KEY=key
 ```
 
 To run:
@@ -62,7 +62,7 @@ you should get:
 echo "Please try again."
 ```
 
-You can change the model using `--model`. The default is `gpt-4o`.
+You can change the model using `--model` or `-m`. The default is `gpt-4o`.
 See [here](https://platform.openai.com/docs/models) for a list of models. For example:
 
 ```bash
@@ -75,7 +75,7 @@ Output:
 ls -lha
 ```
 
-If you pass `--execute`, the tool will run the command for you after printing it! Be careful with this as LLMs often make mistakes:
+If you pass `--execute` or `-e`, the tool will run the command for you after printing it! Be careful with this as LLMs often make mistakes:
 
 ```bash
 ape "Who am I logged in as?"
