@@ -16,12 +16,16 @@ def run(
     model: Annotated[
         str,
         typer.Option(
+            "--model",
+            "-m",
             help="OpenAI model. See https://platform.openai.com/docs/models.",
         ),
     ] = "gpt-4o",
     execute: Annotated[
         bool,
         typer.Option(
+            "--execute",
+            "-e",
             help="Run the command if suggested. Dangerous!",
         ),
     ] = False,
