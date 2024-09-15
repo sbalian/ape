@@ -1,5 +1,7 @@
 .PHONY: install install-no-lock test type-check lint all
 
+all: install test type-check lint
+
 install:
 	poetry install
 
@@ -14,5 +16,3 @@ type-check:
 
 lint:
 	poetry run ruff check
-
-all: install test type-check lint
