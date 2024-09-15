@@ -27,7 +27,7 @@ jobs:
       - name: Run pytest
         run: poetry run pytest
       - name: Type check
-        run: poetry run pyright ape.py test.py
+        run: poetry run pyright
 
   lint:
     name: Lint
@@ -44,4 +44,4 @@ jobs:
       - name: Install the package
         run: poetry install
       - name: Run ruff
-        run: poetry run ruff check ape.py test.py
+        run: poetry run ruff check
