@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ape-linux"
-version = "0.1.2"
+version = "0.2.0"
 description = "AI for Linux commands"
 license = "MIT"
 authors = ["Seto Balian <seto.balian@gmail.com>"]
