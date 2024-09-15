@@ -25,9 +25,9 @@ jobs:
       - name: Install the package (no lockfile)
         run: rm poetry.lock && poetry install
       - name: Run pytest
-        run: poetry run pytest
+        run: poetry run pytest test.py
       - name: Type check
-        run: poetry run pyright
+        run: poetry run pyright ape.py test.py
 
   lint:
     name: Lint
@@ -44,4 +44,4 @@ jobs:
       - name: Install the package
         run: poetry install
       - name: Run ruff
-        run: poetry run ruff check .
+        run: poetry run ruff check ape.py test.py
