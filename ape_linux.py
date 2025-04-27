@@ -96,7 +96,19 @@ def main(
     Answer: echo "Please try again."
 
     Question: Tell me a story
-    Answer: echo "Please try again.\""""  # noqa: E501
+    Answer: echo "Please try again.
+
+    It is important that you do not output commands enclosed in ``` ``` Markdown blocks. For example,
+
+    ```sh
+    cd projects
+    ls
+    ```
+
+    is not allowed. Instead, your output should be a command that is to be entered directly into the command line. For the example above: cd projects && ls
+
+    You are also allowed to use \\ for command continuation.
+    \""""  # noqa: E501
 
     user_prompt = f"""\
     Question: {query.strip()}
