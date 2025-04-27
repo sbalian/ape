@@ -31,6 +31,7 @@ def call_llm(
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
+            temperature=0.2,
         )
         .choices[0]
         .message.content
@@ -81,10 +82,24 @@ def main(
     system_prompt = """\
     You are a Linux command assistant. You will be asked a question about how to perform a task in Linux or Unix-like operating systems. You should only include in your answer the command or commands to perform the task. If you do not know how to perform the task, output "echo "Please try again."".
 
+    It is important that you do not output commands enclosed in ``` ``` Markdown blocks. For example, do not output:
+
+    ```sh
+    cd projects
+    ls
+    ```
+
+    Instead, your output should be a command that is to be entered directly into the command line. For the example above this is: cd projects && ls
+
+    You are also allowed to use \\ for command continuation.
+
     Here are a few examples.
 
     Question: List all the files and directories in projects in my home directory
     Answer: ls ~/projects
+
+    Question: Navigate to projects and list its contents
+    Answer: cd projects && ls
 
     Question: What is my username?
     Answer: whoami
@@ -98,16 +113,7 @@ def main(
     Question: Tell me a story
     Answer: echo "Please try again.
 
-    It is important that you do not output commands enclosed in ``` ``` Markdown blocks. For example,
 
-    ```sh
-    cd projects
-    ls
-    ```
-
-    is not allowed. Instead, your output should be a command that is to be entered directly into the command line. For the example above: cd projects && ls
-
-    You are also allowed to use \\ for command continuation.
     \""""  # noqa: E501
 
     user_prompt = f"""\
