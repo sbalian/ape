@@ -1,5 +1,3 @@
-"""AI for Linux commands."""
-
 import os
 import subprocess
 from typing import Annotated
