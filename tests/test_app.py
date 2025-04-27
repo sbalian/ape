@@ -52,3 +52,10 @@ def test_app_for_suggestion_with_execute(mockenv, monkeypatch):
     assert result.stdout == "ls\n"  # careful, this will actually run
     assert result.stderr == ""
     assert result.exit_code == 0
+
+
+def test_app_for_version(mockenv):
+    result = runner.invoke(ape_linux.app, ["--version"])
+    assert result.stdout == f"{ape_linux.__version__}\n"
+    assert result.stderr == ""
+    assert result.exit_code == 0

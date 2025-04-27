@@ -2,13 +2,22 @@
 
 import os
 import subprocess
+from importlib.metadata import version
 from typing import Annotated
 
 import openai
 import rich.console
 import typer
 
+__version__ = version("ape_linux")
+
 app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
+
+
+def version_callback(value: bool) -> None:
+    if value:
+        typer.echo(__version__)
+        raise typer.Exit()
 
 
 def call_llm(
@@ -49,6 +58,16 @@ def main(
             help="Run the command if suggested. Dangerous!",
         ),
     ] = False,
+    version: Annotated[
+        bool | None,
+        typer.Option(
+            "--version",
+            "-v",
+            callback=version_callback,
+            help="Show the version and exit.",
+            is_eager=True,
+        ),
+    ] = None,
 ):
     """Suggest a command for a Linux task described in QUERY.
 
