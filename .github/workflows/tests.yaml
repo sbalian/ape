@@ -1,4 +1,4 @@
-name: Test and lint
+name: Tests
 
 on: push
 
@@ -9,25 +9,21 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: ['3.10', '3.11', '3.12']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
     defaults:
       run:
         shell: bash
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-      - name: Install the package (no lockfile)
-        run: make install-no-lock
-      - name: Run pytest
-        run: make test
-      - name: Type check
-        run: make type-check
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+      - name: Run type check
+        run: uv run pyright .
+      - name: Run tests
+        run: uv run pytest
 
   lint:
     name: Lint
@@ -35,13 +31,9 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-      - name: Install the package
-        run: make install
-      - name: Run ruff
-        run: make lint
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Set up Python 3.13
+        run: uv python install 3.13
+      - name: Ruff
+        run: uv run ruff check .
