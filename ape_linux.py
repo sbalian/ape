@@ -111,10 +111,7 @@ def main(
     Answer: echo "Please try again."
 
     Question: Tell me a story
-    Answer: echo "Please try again.
-
-
-    \""""  # noqa: E501
+    Answer: echo "Please try again.\""""  # noqa: E501
 
     user_prompt = f"""\
     Question: {query.strip()}
