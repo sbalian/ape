@@ -1,6 +1,6 @@
 [project]
 name = "ape-linux"
-version = "0.3.3"
+version = "0.3.4"
 description = "AI for Linux commands"
 readme = "README.md"
 license = {text = "MIT License"}
