@@ -14,10 +14,10 @@ find ~/user/projects -type f -name "*attention*.pdf" > important_files.txt && mv
 
 Currently, only [OpenAI](https://openai.com/api/) is supported.
 
-To install:
+To install ([`uv`](https://docs.astral.sh/uv/getting-started/installation/) recommended):
 
 ```bash
-pipx install ape-linux
+uv tool install ape-linux
 ```
 
 Next, set your OpenAI API key:
