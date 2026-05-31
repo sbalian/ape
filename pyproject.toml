@@ -1,6 +1,6 @@
 [project]
 name = "ape-linux"
-version = "0.3.5"
+version = "0.4.0"
 description = "AI for Linux commands"
 readme = "README.md"
 license = {text = "MIT License"}
@@ -10,7 +10,7 @@ authors = [
 maintainers = [
     { name = "Seto Balian", email = "seto.balian@gmail.com" }
 ]
-keywords = ["ai", "llm", "linux", "openai"]
+keywords = ["ai", "llm", "linux", "openai", "anthropic", "pydantic-ai"]
 classifiers = [
     "Intended Audience :: Developers",
     "Programming Language :: Python",
@@ -19,7 +19,7 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "openai>=1.76.0",
+    "pydantic-ai-slim[anthropic,google,groq,mistral,openai]>=1.104.0",
     "rich>=14.0.0",
     "typer>=0.15.2",
 ]
@@ -37,15 +37,13 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-    "pyright>=1.1.400",
     "pytest>=8.3.5",
     "ruff>=0.11.7",
+    "ty>=0.0.40",
 ]
 
-[tool.pyright]
-
 [tool.ruff]
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["F", "E", "W", "I001"]

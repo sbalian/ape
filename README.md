@@ -12,7 +12,8 @@ Output:
 find ~/user/projects -type f -name "*attention*.pdf" > important_files.txt && mv important_files.txt ~/Documents/
 ```
 
-Currently, only [OpenAI](https://openai.com/api/) is supported.
+Ape works with any provider supported by [Pydantic AI](https://ai.pydantic.dev/models/)
+— OpenAI, Anthropic, Google, Groq, Mistral and more.
 
 To install ([`uv`](https://docs.astral.sh/uv/getting-started/installation/) recommended):
 
@@ -20,10 +21,12 @@ To install ([`uv`](https://docs.astral.sh/uv/getting-started/installation/) reco
 uv tool install ape-linux
 ```
 
-Next, set your OpenAI API key:
+Next, set the API key for your provider using its standard environment variable.
+For example:
 
 ```bash
-export APE_OPENAI_API_KEY=key
+export OPENAI_API_KEY=key      # for OpenAI models
+export ANTHROPIC_API_KEY=key   # for Anthropic models
 ```
 
 To run:
@@ -62,11 +65,25 @@ you should get:
 echo "Please try again."
 ```
 
-You can change the model using `--model` or `-m`. The default is `gpt-4o`.
-See [here](https://platform.openai.com/docs/models) for a list of models. For example:
+You can change the model using `--model` or `-m`. Models are specified in
+`provider:name` form.
+See [here](https://ai.pydantic.dev/models/) for the supported providers and models.
+For example:
 
 ```bash
-ape "List the contents of the working directory with as much detail as possible" --model gpt-3.5-turbo
+ape "List the contents of the working directory with as much detail as possible" --model anthropic:claude-sonnet-4-5
+```
+
+The model is resolved as follows:
+
+1. If `--model`/`-m` is given, that value is always used.
+2. Otherwise, if the `APE_MODEL` environment variable is set, its value is used.
+3. Otherwise, the default `openai-chat:gpt-4.1` is used.
+
+So you can set a personal default without passing `--model` every time:
+
+```bash
+export APE_MODEL=anthropic:claude-sonnet-4-5
 ```
 
 Output:
@@ -74,6 +91,46 @@ Output:
 ```text
 ls -lha
 ```
+
+## System-aware suggestions
+
+Ape automatically detects a few facts about your machine and adds them to the prompt so
+the suggested command is correct for *your* environment — for example BSD (macOS) vs GNU
+(Linux) flags, the right package manager (`brew`, `apt`, `dnf`, `pacman`, ...), and tools
+that are actually installed. It looks at:
+
+- operating system and version (macOS version or Linux distribution),
+- whether the userland is BSD or GNU,
+- CPU architecture (e.g. `arm64` vs `x86_64`),
+- your shell (`$SHELL`),
+- whether you are root,
+- available package manager(s) and common tools (`rg`, `fd`, `jq`, `docker`, ...).
+
+This is all gathered locally with the Python standard library and is best-effort: if
+anything can't be determined it is simply left out. **No identifying information is
+collected or sent** — never your username, hostname, working directory, or home path.
+
+To see exactly what Ape detects and sends (without calling the model), use
+`--system-info` or `-s`:
+
+```bash
+ape --system-info
+```
+
+Output (example):
+
+```text
+Operating system: Darwin
+macOS version: 26.5
+Userland: BSD (macOS) — prefer BSD-compatible flags
+Architecture: arm64
+Shell: /bin/zsh
+Privileges: non-root (use sudo for privileged actions)
+Package manager(s): brew
+Available tools: rg, fd, jq, git, curl, docker, tar, rsync, sed, awk
+```
+
+## Executing commands
 
 If you pass `--execute` or `-e`, the tool will run the command for you after printing it! Be careful with this as LLMs often make mistakes:
 
