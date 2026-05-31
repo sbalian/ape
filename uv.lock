@@ -40,6 +40,7 @@ version = "0.3.5"
 source = { editable = "." }
 dependencies = [
     { name = "openai" },
+    { name = "rich" },
     { name = "typer" },
 ]
 
@@ -53,6 +54,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "openai", specifier = ">=1.76.0" },
+    { name = "rich", specifier = ">=14.0.0" },
     { name = "typer", specifier = ">=0.15.2" },
 ]
 
