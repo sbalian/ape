@@ -6,7 +6,6 @@ from importlib.metadata import version
 from typing import Annotated
 
 import openai
-import rich.console
 import typer
 
 __version__ = version("ape_linux")
@@ -77,8 +76,6 @@ def main(
     Output : ln -s /mnt/c/Users/jdoe win
     """
 
-    console = rich.console.Console()
-
     system_prompt = """\
     You are a Linux command assistant. You will be asked a question about how to
     perform a task in Linux or Unix-like operating systems. You should only include
@@ -129,10 +126,9 @@ def main(
         raise typer.Exit(1)
 
     try:
-        with console.status("[bold][blue]Processing ...", spinner="monkey"):
-            answer = call_llm(api_key, model, system_prompt, user_prompt)
-            if answer is None:
-                answer = 'echo "Please try again."'
+        answer = call_llm(api_key, model, system_prompt, user_prompt)
+        if answer is None:
+            answer = 'echo "Please try again."'
         typer.echo(answer)
         if execute:
             subprocess.check_call(answer, shell=True)
