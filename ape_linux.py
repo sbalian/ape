@@ -1,13 +1,13 @@
 """AI for Linux commands."""
 
-import os
 import subprocess
 from importlib.metadata import version
 from typing import Annotated
 
-import openai
 import rich.console
 import typer
+from pydantic_ai import Agent
+from pydantic_ai.exceptions import ModelHTTPError
 
 __version__ = version("ape_linux")
 
@@ -20,22 +20,13 @@ def version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
-def call_llm(
-    api_key: str, model: str, system_prompt: str, user_prompt: str
-) -> str | None:
-    return (
-        openai.OpenAI(api_key=api_key)
-        .chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0.2,
-        )
-        .choices[0]
-        .message.content
+def call_llm(model: str, system_prompt: str, user_prompt: str) -> str | None:
+    agent = Agent(
+        model,
+        system_prompt=system_prompt,
+        model_settings={"temperature": 0.2},
     )
+    return agent.run_sync(user_prompt).output
 
 
 @app.command()
@@ -48,9 +39,12 @@ def main(
         typer.Option(
             "--model",
             "-m",
-            help="OpenAI model. See https://platform.openai.com/docs/models.",
+            help=(
+                "Model in provider:name form, e.g. anthropic:claude-sonnet-4-5. "
+                "See https://ai.pydantic.dev/models/."
+            ),
         ),
-    ] = "gpt-4o",
+    ] = "openai-chat:gpt-4o",
     execute: Annotated[
         bool,
         typer.Option(
@@ -123,23 +117,19 @@ def main(
     Answer:"""
 
     try:
-        api_key = os.environ["APE_OPENAI_API_KEY"]
-    except KeyError:
-        typer.echo("Set the environment variable APE_OPENAI_API_KEY.", err=True)
+        with console.status("[bold][blue]Processing ...", spinner="monkey"):
+            answer = call_llm(model, system_prompt, user_prompt)
+    except ModelHTTPError as error:
+        typer.echo(f"{error.status_code} error: {error.message}", err=True)
+        raise typer.Exit(1)
+    except Exception as error:
+        # Anything else (missing/invalid credentials, unknown provider, etc.)
+        # surfaces as a one-line message rather than a traceback.
+        typer.echo(str(error), err=True)
         raise typer.Exit(1)
 
-    try:
-        with console.status("[bold][blue]Processing ...", spinner="monkey"):
-            answer = call_llm(api_key, model, system_prompt, user_prompt)
-            if answer is None:
-                answer = 'echo "Please try again."'
-        typer.echo(answer)
-        if execute:
-            subprocess.check_call(answer, shell=True)
-    except openai.APIStatusError as error:
-        typer.echo(
-            f"OpenAI {error.status_code} error: "
-            f"{error.response.json()['error']['message']}",
-            err=True,
-        )
-        raise typer.Exit(1)
+    if answer is None:
+        answer = 'echo "Please try again."'
+    typer.echo(answer)
+    if execute:
+        subprocess.check_call(answer, shell=True)

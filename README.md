@@ -12,7 +12,8 @@ Output:
 find ~/user/projects -type f -name "*attention*.pdf" > important_files.txt && mv important_files.txt ~/Documents/
 ```
 
-Currently, only [OpenAI](https://openai.com/api/) is supported.
+Ape works with any provider supported by [Pydantic AI](https://ai.pydantic.dev/models/)
+— OpenAI, Anthropic, Google, Groq, Mistral and more.
 
 To install ([`uv`](https://docs.astral.sh/uv/getting-started/installation/) recommended):
 
@@ -20,10 +21,12 @@ To install ([`uv`](https://docs.astral.sh/uv/getting-started/installation/) reco
 uv tool install ape-linux
 ```
 
-Next, set your OpenAI API key:
+Next, set the API key for your provider using its standard environment variable.
+For example:
 
 ```bash
-export APE_OPENAI_API_KEY=key
+export OPENAI_API_KEY=key      # for OpenAI models
+export ANTHROPIC_API_KEY=key   # for Anthropic models
 ```
 
 To run:
@@ -62,11 +65,13 @@ you should get:
 echo "Please try again."
 ```
 
-You can change the model using `--model` or `-m`. The default is `gpt-4o`.
-See [here](https://platform.openai.com/docs/models) for a list of models. For example:
+You can change the model using `--model` or `-m`. Models are specified in
+`provider:name` form. The default is `openai-chat:gpt-4o`.
+See [here](https://ai.pydantic.dev/models/) for the supported providers and models.
+For example:
 
 ```bash
-ape "List the contents of the working directory with as much detail as possible" --model gpt-3.5-turbo
+ape "List the contents of the working directory with as much detail as possible" --model anthropic:claude-sonnet-4-5
 ```
 
 Output:

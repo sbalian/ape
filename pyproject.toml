@@ -10,7 +10,7 @@ authors = [
 maintainers = [
     { name = "Seto Balian", email = "seto.balian@gmail.com" }
 ]
-keywords = ["ai", "llm", "linux", "openai"]
+keywords = ["ai", "llm", "linux", "openai", "anthropic", "pydantic-ai"]
 classifiers = [
     "Intended Audience :: Developers",
     "Programming Language :: Python",
@@ -19,7 +19,7 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "openai>=1.76.0",
+    "pydantic-ai-slim[anthropic,google,groq,mistral,openai]>=1.104.0",
     "rich>=14.0.0",
     "typer>=0.15.2",
 ]
