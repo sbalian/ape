@@ -80,16 +80,21 @@ def main(
     console = rich.console.Console()
 
     system_prompt = """\
-    You are a Linux command assistant. You will be asked a question about how to perform a task in Linux or Unix-like operating systems. You should only include in your answer the command or commands to perform the task. If you do not know how to perform the task, output "echo "Please try again."".
+    You are a Linux command assistant. You will be asked a question about how to
+    perform a task in Linux or Unix-like operating systems. You should only include
+    in your answer the command or commands to perform the task. If you do not know how
+    to perform the task, output "echo "Please try again."".
 
-    It is important that you do not output commands enclosed in ``` ``` Markdown blocks. For example, do not output:
+    It is important that you do not output commands enclosed in ``` ``` Markdown
+    blocks. For example, do not output:
 
     ```sh
     cd projects
     ls
     ```
 
-    Instead, your output should be a command that is to be entered directly into the command line. For the example above this is: cd projects && ls
+    Instead, your output should be a command that is to be entered directly into the
+    command line. For the example above this is: cd projects && ls
 
     You are also allowed to use \\ for command continuation.
 
@@ -111,7 +116,7 @@ def main(
     Answer: echo "Please try again."
 
     Question: Tell me a story
-    Answer: echo "Please try again.\""""  # noqa: E501
+    Answer: echo "Please try again.\""""
 
     user_prompt = f"""\
     Question: {query.strip()}
