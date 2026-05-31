@@ -20,10 +20,12 @@ jobs:
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
+      - name: Set up just
+        uses: extractions/setup-just@v3
       - name: Run type check
-        run: uv run pyright .
+        run: just type-check
       - name: Run tests
-        run: uv run pytest
+        run: just test
 
   lint:
     name: Lint
@@ -35,5 +37,7 @@ jobs:
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
       - name: Set up Python 3.13
         run: uv python install 3.13
+      - name: Set up just
+        uses: extractions/setup-just@v3
       - name: Ruff
-        run: uv run ruff check .
+        run: just lint

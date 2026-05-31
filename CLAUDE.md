@@ -19,22 +19,27 @@ this one file.
 
 ## Commands
 
-This project uses [`uv`](https://docs.astral.sh/uv/) for everything.
+This project uses [`uv`](https://docs.astral.sh/uv/) for everything, with
+[`just`](https://github.com/casey/just) wrapping the CI-relevant tasks.
+
+```bash
+just lint                     # lint (uv run ruff check .)
+just type-check               # type check with ty (uv run ty check)
+just test                     # run all tests (uv run pytest)
+```
+
+The `justfile` recipes are the single source of truth for lint, type-check, and test:
+both local dev and CI (`.github/workflows/tests.yaml`) invoke them, so the two can't
+drift. CI installs `just` via the `extractions/setup-just` action. Other useful
+commands:
 
 ```bash
 uv sync                       # install deps + dev group into .venv
-uv run pytest                 # run all tests
 uv run pytest tests/test_app.py::test_app_for_version   # run a single test
-uv run ruff check .           # lint
 uv run ruff format .          # format
-uv run ty check               # type check (dev dependency)
 uv run ape "list all files"   # run the CLI locally
 uv build                      # build the wheel/sdist
 ```
-
-Note: CI (`.github/workflows/tests.yaml`) currently invokes `uv run pyright .` for
-type checking even though `ty` is the declared dev dependency — keep this in mind if
-type-check results differ between local and CI.
 
 ## Architecture
 
