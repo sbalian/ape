@@ -4,7 +4,7 @@ import typer.testing
 
 import ape_linux
 
-runner = typer.testing.CliRunner(mix_stderr=False)
+runner = typer.testing.CliRunner()
 
 
 @pytest.fixture
