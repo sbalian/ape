@@ -37,12 +37,10 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-    "pyright>=1.1.400",
     "pytest>=8.3.5",
     "ruff>=0.11.7",
+    "ty>=0.0.40",
 ]
-
-[tool.pyright]
 
 [tool.ruff]
 target-version = "py314"
