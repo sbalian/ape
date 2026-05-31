@@ -13,6 +13,10 @@ Ape (`ape-linux` on PyPI) is a CLI that turns a natural-language description of 
 Linux task into a shell command using an LLM. The entire implementation lives in a
 single module, `ape_linux.py`, exposing a Typer app as the `ape` console script.
 
+**Single-file rule:** all of Ape's implementation must stay in `ape_linux.py` — do
+not split it into additional modules/packages. New behavior is added as functions in
+this one file.
+
 ## Commands
 
 This project uses [`uv`](https://docs.astral.sh/uv/) for everything.
@@ -37,11 +41,25 @@ type-check results differ between local and CI.
 The flow in `ape_linux.py` is intentionally minimal:
 
 1. `main()` is the single Typer command. It takes the `query` argument plus
-   `--model/-m`, `--execute/-e`, and `--version/-v` options.
+   `--model/-m`, `--execute/-e`, `--system-info/-s`, and `--version/-v` options.
+   `--system-info` is an eager flag (like `--version`) whose callback prints
+   `detect_system_context()` and exits before the LLM is called, so it works without a
+   `query`.
 2. A hard-coded `system_prompt` (with few-shot examples) constrains the model to emit
    **only** a runnable command — no Markdown fences — or `echo "Please try again."`
    for anything off-topic. This prompt is the core product behavior; changes to it
-   directly change what the tool outputs.
+   directly change what the tool outputs. `main()` then appends a system-context block
+   (see below) so suggestions match the current machine.
+2a. `detect_system_context()` returns a best-effort, newline-separated `Key: value`
+   block describing the current machine (OS family + macOS/distro version, GNU-vs-BSD
+   userland, CPU arch, `$SHELL`, root-or-not, available package managers, and a probed
+   list of common tools). Two invariants: it **never raises** (every probe is guarded,
+   so an unavailable API or missing file just omits that field instead of crashing at
+   startup), and it **never includes identifying info** (no username, hostname, working
+   directory, or home path). Everything is stdlib (`platform`, `os`, `shutil.which`) and
+   stat-based — no subprocesses — to keep startup fast. Notable guards:
+   `platform.freedesktop_os_release()` raises `OSError` on macOS/minimal containers, and
+   `os.geteuid()` is absent on non-Unix platforms (`hasattr` check).
 3. `call_llm()` wraps `pydantic_ai.Agent`, which is the provider abstraction. Models
    are passed through verbatim in `provider:name` form (e.g. `anthropic:claude-sonnet-4-5`),
    so Ape supports any provider Pydantic AI supports without provider-specific code.
@@ -62,6 +80,12 @@ The flow in `ape_linux.py` is intentionally minimal:
 dummy `OPENAI_API_KEY`. Note `test_app_for_suggestion_with_execute` mocks the LLM to
 return `ls` and actually executes it (harmless, but be aware when adding execute-path
 tests — avoid destructive mocked commands).
+
+`detect_system_context()` is covered by tests that assert it returns a string without
+crashing, reports the OS, and — importantly — excludes the current username, hostname,
+working directory, and home path. These run against the real host (no mocking), so keep
+them platform-agnostic; the username check skips the `root` collision with the privilege
+line.
 
 ## Conventions
 

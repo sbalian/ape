@@ -1,3 +1,7 @@
+import getpass
+import os
+import socket
+
 import pytest
 import typer.testing
 from pydantic_ai.exceptions import ModelHTTPError
@@ -106,3 +110,44 @@ def test_app_for_version(mockenv):
     assert result.stdout == f"{ape_linux.__version__}\n"
     assert result.stderr == ""
     assert result.exit_code == 0
+
+
+def test_app_system_info_flag(mockenv, monkeypatch):
+    # The flag must print the context and exit without ever calling the LLM.
+    def fail(*args, **kwargs):
+        raise AssertionError("call_llm should not be invoked for --system-info")
+
+    monkeypatch.setattr("ape_linux.call_llm", fail)
+    result = runner.invoke(ape_linux.app, ["--system-info"])
+    assert result.stdout == f"{ape_linux.detect_system_context()}\n"
+    assert result.exit_code == 0
+
+
+def test_detect_system_context_returns_str_and_never_crashes():
+    context = ape_linux.detect_system_context()
+    assert isinstance(context, str)
+
+
+def test_detect_system_context_reports_operating_system():
+    # platform.system() is non-empty on every supported platform.
+    context = ape_linux.detect_system_context()
+    assert "Operating system:" in context
+
+
+def test_detect_system_context_excludes_identifying_info():
+    context = ape_linux.detect_system_context()
+
+    # No working directory or home/directory structure.
+    assert os.getcwd() not in context
+    assert os.path.expanduser("~") not in context
+
+    # No hostname.
+    hostname = socket.gethostname()
+    if hostname:
+        assert hostname not in context
+
+    # No username. ("root" legitimately appears in the privilege line, so
+    # skip that unavoidable collision when running as root.)
+    username = getpass.getuser()
+    if username and username != "root":
+        assert username not in context
