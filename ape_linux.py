@@ -1,5 +1,6 @@
 """AI for Linux commands."""
 
+import os
 import subprocess
 from importlib.metadata import version
 from typing import Annotated
@@ -10,6 +11,8 @@ from pydantic_ai import Agent
 from pydantic_ai.exceptions import ModelHTTPError
 
 __version__ = version("ape_linux")
+
+DEFAULT_MODEL = "openai-chat:gpt-4.1"
 
 app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
 
@@ -35,16 +38,17 @@ def main(
         str, typer.Argument(help="Query describing a Linux task.", show_default=False)
     ],
     model: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--model",
             "-m",
             help=(
                 "Model in provider:name form, e.g. anthropic:claude-sonnet-4-5. "
-                "See https://ai.pydantic.dev/models/."
+                "See https://ai.pydantic.dev/models/. If unset, the APE_MODEL "
+                f"env var is used, falling back to {DEFAULT_MODEL}."
             ),
         ),
-    ] = "openai-chat:gpt-4o",
+    ] = None,
     execute: Annotated[
         bool,
         typer.Option(
@@ -72,6 +76,10 @@ def main(
     """
 
     console = rich.console.Console()
+
+    # An explicit --model wins. Otherwise fall back to APE_MODEL, then the default.
+    if model is None:
+        model = os.environ.get("APE_MODEL") or DEFAULT_MODEL
 
     system_prompt = """\
     You are a Linux command assistant. You will be asked a question about how to

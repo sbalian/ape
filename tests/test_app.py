@@ -56,6 +56,51 @@ def test_app_for_suggestion_with_execute(mockenv, monkeypatch):
     assert result.exit_code == 0
 
 
+def test_app_uses_default_model_when_unset(mockenv, monkeypatch):
+    captured = {}
+
+    def mockreturn(model, *args, **kwargs):
+        captured["model"] = model
+        return "ls"
+
+    monkeypatch.delenv("APE_MODEL", raising=False)
+    monkeypatch.setattr("ape_linux.call_llm", mockreturn)
+    result = runner.invoke(ape_linux.app, ["list all the files"])
+    assert captured["model"] == ape_linux.DEFAULT_MODEL
+    assert ape_linux.DEFAULT_MODEL == "openai-chat:gpt-4.1"
+    assert result.exit_code == 0
+
+
+def test_app_uses_ape_model_env_var(mockenv, monkeypatch):
+    captured = {}
+
+    def mockreturn(model, *args, **kwargs):
+        captured["model"] = model
+        return "ls"
+
+    monkeypatch.setenv("APE_MODEL", "anthropic:claude-sonnet-4-5")
+    monkeypatch.setattr("ape_linux.call_llm", mockreturn)
+    result = runner.invoke(ape_linux.app, ["list all the files"])
+    assert captured["model"] == "anthropic:claude-sonnet-4-5"
+    assert result.exit_code == 0
+
+
+def test_app_model_option_overrides_env_var(mockenv, monkeypatch):
+    captured = {}
+
+    def mockreturn(model, *args, **kwargs):
+        captured["model"] = model
+        return "ls"
+
+    monkeypatch.setenv("APE_MODEL", "anthropic:claude-sonnet-4-5")
+    monkeypatch.setattr("ape_linux.call_llm", mockreturn)
+    result = runner.invoke(
+        ape_linux.app, ["list all the files", "--model", "groq:llama-3.3-70b"]
+    )
+    assert captured["model"] == "groq:llama-3.3-70b"
+    assert result.exit_code == 0
+
+
 def test_app_for_version(mockenv):
     result = runner.invoke(ape_linux.app, ["--version"])
     assert result.stdout == f"{ape_linux.__version__}\n"

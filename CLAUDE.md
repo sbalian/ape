@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Keep this file current.** Whenever you make a change that affects anything
+> described here — behavior, commands, architecture, conventions, defaults, file
+> layout — update the relevant section of CLAUDE.md (and `README.md` where it
+> overlaps) in the same change, so the docs never drift from the code.
+
 ## Overview
 
 Ape (`ape-linux` on PyPI) is a CLI that turns a natural-language description of a
@@ -38,10 +43,12 @@ The flow in `ape_linux.py` is intentionally minimal:
    for anything off-topic. This prompt is the core product behavior; changes to it
    directly change what the tool outputs.
 3. `call_llm()` wraps `pydantic_ai.Agent`, which is the provider abstraction. Models
-   are passed through verbatim in `provider:name` form (e.g. `anthropic:claude-sonnet-4-5`,
-   default `openai-chat:gpt-4o`), so Ape supports any provider Pydantic AI supports
-   without provider-specific code. Credentials come from each provider's standard env
-   var (e.g. `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`).
+   are passed through verbatim in `provider:name` form (e.g. `anthropic:claude-sonnet-4-5`),
+   so Ape supports any provider Pydantic AI supports without provider-specific code.
+   `--model` defaults to `None`; `main()` resolves the model as `--model` (if given)
+   → `APE_MODEL` env var → the `DEFAULT_MODEL` constant (`openai-chat:gpt-4.1`).
+   Credentials come from each provider's standard env var (e.g. `OPENAI_API_KEY`,
+   `ANTHROPIC_API_KEY`).
 4. Errors are flattened to one-line stderr messages with exit code 1 —
    `ModelHTTPError` reports status/message; any other exception (bad credentials,
    unknown provider) prints `str(error)`. Tracebacks are suppressed via

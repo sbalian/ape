@@ -66,12 +66,24 @@ echo "Please try again."
 ```
 
 You can change the model using `--model` or `-m`. Models are specified in
-`provider:name` form. The default is `openai-chat:gpt-4o`.
+`provider:name` form.
 See [here](https://ai.pydantic.dev/models/) for the supported providers and models.
 For example:
 
 ```bash
 ape "List the contents of the working directory with as much detail as possible" --model anthropic:claude-sonnet-4-5
+```
+
+The model is resolved as follows:
+
+1. If `--model`/`-m` is given, that value is always used.
+2. Otherwise, if the `APE_MODEL` environment variable is set, its value is used.
+3. Otherwise, the default `openai-chat:gpt-4.1` is used.
+
+So you can set a personal default without passing `--model` every time:
+
+```bash
+export APE_MODEL=anthropic:claude-sonnet-4-5
 ```
 
 Output:
