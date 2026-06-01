@@ -3,32 +3,31 @@
 import os
 import platform
 import shutil
-import subprocess
-from importlib.metadata import version
-from typing import Annotated
+import sys
 
-import rich.console
-import typer
 from pydantic_ai import Agent
 from pydantic_ai.exceptions import ModelHTTPError
 
-__version__ = version("ape_linux")
-
 DEFAULT_MODEL = "openai-chat:gpt-4.1"
 
-app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
+HELP = """\
+ape — AI for Linux commands.
 
+Usage: ape QUERY
 
-def version_callback(value: bool) -> None:
-    if value:
-        typer.echo(__version__)
-        raise typer.Exit()
+Describe a Linux task in QUERY and ape prints a shell command for it.
 
+Example:
+    ape "Create a symbolic link named 'win' pointing to /mnt/c/Users/jdoe"
+    ln -s /mnt/c/Users/jdoe win
 
-def system_info_callback(value: bool) -> None:
-    if value:
-        typer.echo(detect_system_context())
-        raise typer.Exit()
+The model is read from the APE_MODEL environment variable in provider:name form
+(e.g. anthropic:claude-sonnet-4-5), falling back to {default}. See
+https://ai.pydantic.dev/models/. Credentials come from each provider's standard
+environment variable (e.g. OPENAI_API_KEY, ANTHROPIC_API_KEY).
+
+Run `ape-system-info` to print the detected system context sent to the model.\
+""".format(default=DEFAULT_MODEL)
 
 
 def call_llm(model: str, system_prompt: str, user_prompt: str) -> str | None:
@@ -149,64 +148,26 @@ def detect_system_context() -> str:
     return "\n".join(lines)
 
 
-@app.command()
-def main(
-    query: Annotated[
-        str, typer.Argument(help="Query describing a Linux task.", show_default=False)
-    ],
-    model: Annotated[
-        str | None,
-        typer.Option(
-            "--model",
-            "-m",
-            help=(
-                "Model in provider:name form, e.g. anthropic:claude-sonnet-4-5. "
-                "See https://ai.pydantic.dev/models/. If unset, the APE_MODEL "
-                f"env var is used, falling back to {DEFAULT_MODEL}."
-            ),
-        ),
-    ] = None,
-    execute: Annotated[
-        bool,
-        typer.Option(
-            "--execute",
-            "-e",
-            help="Run the command if suggested. Dangerous!",
-        ),
-    ] = False,
-    system_info: Annotated[
-        bool | None,
-        typer.Option(
-            "--system-info",
-            "-s",
-            callback=system_info_callback,
-            help="Show the detected system context sent to the model, then exit.",
-            is_eager=True,
-        ),
-    ] = None,
-    version: Annotated[
-        bool | None,
-        typer.Option(
-            "--version",
-            "-v",
-            callback=version_callback,
-            help="Show the version and exit.",
-            is_eager=True,
-        ),
-    ] = None,
-):
-    """Suggest a command for a Linux task described in QUERY.
+def system_info() -> None:
+    """Entry point for `ape-system-info`: print the detected system context."""
+    print(detect_system_context())
 
-    Example: ape "Create a symbolic link named 'win' pointing to /mnt/c/Users/jdoe"
 
-    Output : ln -s /mnt/c/Users/jdoe win
+def main() -> None:
+    """Entry point for `ape`: suggest a command for the task in the arguments.
+
+    The query is taken from the command-line arguments (``sys.argv``). With no
+    arguments, the help text is printed and the program exits non-zero.
     """
 
-    console = rich.console.Console()
+    args = sys.argv[1:]
+    if not args:
+        print(HELP)
+        raise SystemExit(1)
+    query = " ".join(args)
 
-    # An explicit --model wins. Otherwise fall back to APE_MODEL, then the default.
-    if model is None:
-        model = os.environ.get("APE_MODEL") or DEFAULT_MODEL
+    # The model is read from APE_MODEL, falling back to the default.
+    model = os.environ.get("APE_MODEL") or DEFAULT_MODEL
 
     system_prompt = """\
     You are a Linux command assistant. You will be asked a question about how to
@@ -264,19 +225,16 @@ def main(
     Answer:"""
 
     try:
-        with console.status("[bold][blue]Processing ...", spinner="monkey"):
-            answer = call_llm(model, system_prompt, user_prompt)
+        answer = call_llm(model, system_prompt, user_prompt)
     except ModelHTTPError as error:
-        typer.echo(f"{error.status_code} error: {error.message}", err=True)
-        raise typer.Exit(1)
+        print(f"{error.status_code} error: {error.message}", file=sys.stderr)
+        raise SystemExit(1)
     except Exception as error:
         # Anything else (missing/invalid credentials, unknown provider, etc.)
         # surfaces as a one-line message rather than a traceback.
-        typer.echo(str(error), err=True)
-        raise typer.Exit(1)
+        print(str(error), file=sys.stderr)
+        raise SystemExit(1)
 
     if answer is None:
         answer = 'echo "Please try again."'
-    typer.echo(answer)
-    if execute:
-        subprocess.check_call(answer, shell=True)
+    print(answer)

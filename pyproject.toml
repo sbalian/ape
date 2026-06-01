@@ -20,8 +20,6 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "pydantic-ai-slim[anthropic,google,groq,mistral,openai]>=1.104.0",
-    "rich>=14.0.0",
-    "typer>=0.15.2",
 ]
 
 [project.urls]
@@ -29,7 +27,8 @@ Homepage = "https://github.com/sbalian/ape"
 Repository = "https://github.com/sbalian/ape"
 
 [project.scripts]
-ape = "ape_linux:app"
+ape = "ape_linux:main"
+ape-system-info = "ape_linux:system_info"
 
 [build-system]
 requires = ["hatchling"]

@@ -65,32 +65,16 @@ you should get:
 echo "Please try again."
 ```
 
-You can change the model using `--model` or `-m`. Models are specified in
-`provider:name` form.
+You can change the model with the `APE_MODEL` environment variable. Models are
+specified in `provider:name` form.
 See [here](https://ai.pydantic.dev/models/) for the supported providers and models.
 For example:
-
-```bash
-ape "List the contents of the working directory with as much detail as possible" --model anthropic:claude-sonnet-4-5
-```
-
-The model is resolved as follows:
-
-1. If `--model`/`-m` is given, that value is always used.
-2. Otherwise, if the `APE_MODEL` environment variable is set, its value is used.
-3. Otherwise, the default `openai-chat:gpt-4.1` is used.
-
-So you can set a personal default without passing `--model` every time:
 
 ```bash
 export APE_MODEL=anthropic:claude-sonnet-4-5
 ```
 
-Output:
-
-```text
-ls -lha
-```
+If `APE_MODEL` is unset, the default `openai-chat:gpt-4.1` is used.
 
 ## System-aware suggestions
 
@@ -110,11 +94,11 @@ This is all gathered locally with the Python standard library and is best-effort
 anything can't be determined it is simply left out. **No identifying information is
 collected or sent** — never your username, hostname, working directory, or home path.
 
-To see exactly what Ape detects and sends (without calling the model), use
-`--system-info` or `-s`:
+To see exactly what Ape detects and sends (without calling the model), run
+`ape-system-info`:
 
 ```bash
-ape --system-info
+ape-system-info
 ```
 
 Output (example):
@@ -128,27 +112,6 @@ Shell: /bin/zsh
 Privileges: non-root (use sudo for privileged actions)
 Package manager(s): brew
 Available tools: rg, fd, jq, git, curl, docker, tar, rsync, sed, awk
-```
-
-## Executing commands
-
-If you pass `--execute` or `-e`, the tool will run the command for you after printing it! Be careful with this as LLMs often make mistakes:
-
-```bash
-ape "Who am I logged in as?"
-```
-
-Output:
-
-```text
-whoami
-jdoe
-```
-
-For more help:
-
-```bash
-ape --help
 ```
 
 See also: [Gorilla](https://github.com/gorilla-llm)
