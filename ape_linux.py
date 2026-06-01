@@ -91,6 +91,25 @@ def detect_system_context() -> str:
         if distribution:
             lines.append(f"Distribution: {distribution}")
 
+        # WSL (Windows Subsystem for Linux). WSL2 sets WSL_DISTRO_NAME /
+        # WSL_INTEROP, and both WSL1 and WSL2 ship a kernel whose release
+        # string contains "microsoft" (e.g. 5.15.0-microsoft-standard-WSL2).
+        # platform.uname() never raises. This matters because Windows drives
+        # are mounted under /mnt and interop tools like clip.exe are available.
+        try:
+            release = platform.uname().release
+        except Exception:
+            release = ""
+        if (
+            os.environ.get("WSL_DISTRO_NAME")
+            or os.environ.get("WSL_INTEROP")
+            or "microsoft" in release.lower()
+        ):
+            lines.append(
+                "WSL: yes (Windows Subsystem for Linux; "
+                "Windows drives under /mnt, interop tools like clip.exe available)"
+            )
+
     # CPU architecture (e.g. arm64 vs x86_64) — affects Homebrew prefixes and
     # binary/platform names. Never raises; may be empty.
     machine = platform.machine()
