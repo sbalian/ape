@@ -32,7 +32,7 @@ export ANTHROPIC_API_KEY=key   # for Anthropic models
 To run:
 
 ```bash
-ape "Create a symbolic link called win pointing to /mnt/c/Users/jdoe"
+ape Create a symbolic link called win pointing to /mnt/c/Users/jdoe
 ```
 
 Output:
@@ -44,7 +44,7 @@ ln -s /mnt/c/Users/jdoe win
 Another example:
 
 ```bash
-ape "Delete all the .venv directories under projects/"
+ape Delete all the .venv directories under projects/
 ```
 
 Output:
@@ -56,7 +56,7 @@ find projects/ -type d -name ".venv" -exec rm -rf {} +
 If you try to ask something unrelated to Linux commands:
 
 ```bash
-ape "Tell me about monkeys"
+ape Tell me about monkeys
 ```
 
 you should get:
