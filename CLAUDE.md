@@ -11,7 +11,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Ape (`ape-linux` on PyPI) is a CLI that turns a natural-language description of a
 Linux task into a shell command using an LLM. The entire implementation lives in a
-single module, `ape_linux.py`, exposing a Typer app as the `ape` console script.
+single module, `ape_linux.py`, exposing two console scripts: `ape` (→ `main()`) and
+`ape-system-info` (→ `system_info()`). It has no CLI framework — argument handling is
+plain `sys.argv`.
 
 **Single-file rule:** all of Ape's implementation must stay in `ape_linux.py` — do
 not split it into additional modules/packages. New behavior is added as functions in
@@ -45,11 +47,12 @@ uv build                      # build the wheel/sdist
 
 The flow in `ape_linux.py` is intentionally minimal:
 
-1. `main()` is the single Typer command. It takes the `query` argument plus
-   `--model/-m`, `--execute/-e`, `--system-info/-s`, and `--version/-v` options.
-   `--system-info` is an eager flag (like `--version`) whose callback prints
-   `detect_system_context()` and exits before the LLM is called, so it works without a
-   `query`.
+1. `main()` is the `ape` entry point. It builds the query by joining `sys.argv[1:]`
+   with spaces, so both `ape "list files"` and `ape list files` work. With no
+   arguments it prints the `HELP` text and exits with code 1. There are no flags —
+   model selection, execution, version, and system-info are all gone. A separate
+   `system_info()` function backs the `ape-system-info` console script; it just prints
+   `detect_system_context()`.
 2. A hard-coded `system_prompt` (with few-shot examples) constrains the model to emit
    **only** a runnable command — no Markdown fences — or `echo "Please try again."`
    for anything off-topic. This prompt is the core product behavior; changes to it
@@ -68,23 +71,21 @@ The flow in `ape_linux.py` is intentionally minimal:
 3. `call_llm()` wraps `pydantic_ai.Agent`, which is the provider abstraction. Models
    are passed through verbatim in `provider:name` form (e.g. `anthropic:claude-sonnet-4-5`),
    so Ape supports any provider Pydantic AI supports without provider-specific code.
-   `--model` defaults to `None`; `main()` resolves the model as `--model` (if given)
-   → `APE_MODEL` env var → the `DEFAULT_MODEL` constant (`openai-chat:gpt-4.1`).
-   Credentials come from each provider's standard env var (e.g. `OPENAI_API_KEY`,
-   `ANTHROPIC_API_KEY`).
-4. Errors are flattened to one-line stderr messages with exit code 1 —
+   The model is resolved solely from the `APE_MODEL` env var → the `DEFAULT_MODEL`
+   constant (`openai-chat:gpt-4.1`); there is no CLI override. Credentials come from
+   each provider's standard env var (e.g. `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`).
+4. Errors are flattened to one-line stderr messages, raising `SystemExit(1)` —
    `ModelHTTPError` reports status/message; any other exception (bad credentials,
-   unknown provider) prints `str(error)`. Tracebacks are suppressed via
-   `pretty_exceptions_enable=False` on the Typer app.
-5. With `--execute`, the suggested command is run via `subprocess.check_call(..., shell=True)`.
+   unknown provider) prints `str(error)`. There is no CLI framework swallowing
+   tracebacks, so exceptions are caught explicitly.
 
 ## Testing
 
-`tests/test_app.py` uses `typer.testing.CliRunner` and monkeypatches
+`tests/test_app.py` drives `main()` directly via a `run()` helper that monkeypatches
+`sys.argv` and returns the `SystemExit` code (0 on the success path, since `main()`
+doesn't exit then), asserting on captured stdout/stderr with `capsys`. It monkeypatches
 `ape_linux.call_llm` so no real network/LLM calls happen. The `mockenv` fixture sets a
-dummy `OPENAI_API_KEY`. Note `test_app_for_suggestion_with_execute` mocks the LLM to
-return `ls` and actually executes it (harmless, but be aware when adding execute-path
-tests — avoid destructive mocked commands).
+dummy `OPENAI_API_KEY`.
 
 `detect_system_context()` is covered by tests that assert it returns a string without
 crashing, reports the OS, and — importantly — excludes the current username, hostname,

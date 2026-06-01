@@ -3,12 +3,9 @@ import os
 import socket
 
 import pytest
-import typer.testing
 from pydantic_ai.exceptions import ModelHTTPError
 
 import ape_linux
-
-runner = typer.testing.CliRunner()
 
 
 @pytest.fixture
@@ -16,48 +13,76 @@ def mockenv(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "key")
 
 
-def test_app_for_suggestion(mockenv, monkeypatch):
+def run(monkeypatch, argv):
+    """Run ape_linux.main() with the given argv, returning the SystemExit code.
+
+    main() never calls sys.exit() on the success path, so a clean run returns 0.
+    """
+    monkeypatch.setattr("sys.argv", ["ape", *argv])
+    try:
+        ape_linux.main()
+    except SystemExit as exit:
+        return exit.code or 0
+    return 0
+
+
+def test_app_for_suggestion(mockenv, monkeypatch, capsys):
     monkeypatch.setattr("ape_linux.call_llm", lambda *args, **kwargs: "ls")
-    result = runner.invoke(ape_linux.app, ["list all the files"])
-    assert result.stdout == "ls\n"
-    assert result.stderr == ""
-    assert result.exit_code == 0
+    code = run(monkeypatch, ["list all the files"])
+    captured = capsys.readouterr()
+    assert captured.out == "ls\n"
+    assert captured.err == ""
+    assert code == 0
 
 
-def test_app_for_try_again_if_api_returns_none(mockenv, monkeypatch):
+def test_app_joins_multiple_args_into_query(mockenv, monkeypatch, capsys):
+    captured_prompt = {}
+
+    def mockreturn(model, system_prompt, user_prompt):
+        captured_prompt["user"] = user_prompt
+        return "ls"
+
+    monkeypatch.setattr("ape_linux.call_llm", mockreturn)
+    run(monkeypatch, ["list", "all", "the", "files"])
+    assert "list all the files" in captured_prompt["user"]
+
+
+def test_app_prints_help_and_exits_when_no_args(monkeypatch, capsys):
+    code = run(monkeypatch, [])
+    captured = capsys.readouterr()
+    assert "Usage: ape QUERY" in captured.out
+    assert code == 1
+
+
+def test_app_for_try_again_if_api_returns_none(mockenv, monkeypatch, capsys):
     monkeypatch.setattr("ape_linux.call_llm", lambda *args, **kwargs: None)
-    result = runner.invoke(ape_linux.app, ["what is the capital of England?"])
-    assert result.stdout == 'echo "Please try again."\n'
-    assert result.stderr == ""
-    assert result.exit_code == 0
+    code = run(monkeypatch, ["what is the capital of England?"])
+    captured = capsys.readouterr()
+    assert captured.out == 'echo "Please try again."\n'
+    assert captured.err == ""
+    assert code == 0
 
 
-def test_app_with_api_error(mockenv, monkeypatch):
+def test_app_with_api_error(mockenv, monkeypatch, capsys):
     def mockreturn(*args, **kwargs):
         raise ModelHTTPError(
             status_code=500, model_name="openai-chat:gpt-4o", body=None
         )
 
     monkeypatch.setattr("ape_linux.call_llm", mockreturn)
-    result = runner.invoke(ape_linux.app, ["list all the files"])
-    assert result.stdout == ""
-    assert result.exit_code == 1
+    code = run(monkeypatch, ["list all the files"])
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert code == 1
 
 
-def test_app_with_no_api_key(mockenv, monkeypatch):
+def test_app_with_no_api_key(mockenv, monkeypatch, capsys):
     monkeypatch.delenv("OPENAI_API_KEY")
-    result = runner.invoke(ape_linux.app, ["list all the files"])
-    assert result.stdout == ""
-    assert result.stderr != ""
-    assert result.exit_code == 1
-
-
-def test_app_for_suggestion_with_execute(mockenv, monkeypatch):
-    monkeypatch.setattr("ape_linux.call_llm", lambda *args, **kwargs: "ls")
-    result = runner.invoke(ape_linux.app, ["list all the files", "--execute"])
-    assert result.stdout == "ls\n"  # careful, this will actually run
-    assert result.stderr == ""
-    assert result.exit_code == 0
+    code = run(monkeypatch, ["list all the files"])
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err != ""
+    assert code == 1
 
 
 def test_app_uses_default_model_when_unset(mockenv, monkeypatch):
@@ -69,10 +94,10 @@ def test_app_uses_default_model_when_unset(mockenv, monkeypatch):
 
     monkeypatch.delenv("APE_MODEL", raising=False)
     monkeypatch.setattr("ape_linux.call_llm", mockreturn)
-    result = runner.invoke(ape_linux.app, ["list all the files"])
+    code = run(monkeypatch, ["list all the files"])
     assert captured["model"] == ape_linux.DEFAULT_MODEL
     assert ape_linux.DEFAULT_MODEL == "openai-chat:gpt-4.1"
-    assert result.exit_code == 0
+    assert code == 0
 
 
 def test_app_uses_ape_model_env_var(mockenv, monkeypatch):
@@ -84,43 +109,15 @@ def test_app_uses_ape_model_env_var(mockenv, monkeypatch):
 
     monkeypatch.setenv("APE_MODEL", "anthropic:claude-sonnet-4-5")
     monkeypatch.setattr("ape_linux.call_llm", mockreturn)
-    result = runner.invoke(ape_linux.app, ["list all the files"])
+    code = run(monkeypatch, ["list all the files"])
     assert captured["model"] == "anthropic:claude-sonnet-4-5"
-    assert result.exit_code == 0
+    assert code == 0
 
 
-def test_app_model_option_overrides_env_var(mockenv, monkeypatch):
-    captured = {}
-
-    def mockreturn(model, *args, **kwargs):
-        captured["model"] = model
-        return "ls"
-
-    monkeypatch.setenv("APE_MODEL", "anthropic:claude-sonnet-4-5")
-    monkeypatch.setattr("ape_linux.call_llm", mockreturn)
-    result = runner.invoke(
-        ape_linux.app, ["list all the files", "--model", "groq:llama-3.3-70b"]
-    )
-    assert captured["model"] == "groq:llama-3.3-70b"
-    assert result.exit_code == 0
-
-
-def test_app_for_version(mockenv):
-    result = runner.invoke(ape_linux.app, ["--version"])
-    assert result.stdout == f"{ape_linux.__version__}\n"
-    assert result.stderr == ""
-    assert result.exit_code == 0
-
-
-def test_app_system_info_flag(mockenv, monkeypatch):
-    # The flag must print the context and exit without ever calling the LLM.
-    def fail(*args, **kwargs):
-        raise AssertionError("call_llm should not be invoked for --system-info")
-
-    monkeypatch.setattr("ape_linux.call_llm", fail)
-    result = runner.invoke(ape_linux.app, ["--system-info"])
-    assert result.stdout == f"{ape_linux.detect_system_context()}\n"
-    assert result.exit_code == 0
+def test_system_info_entry_point(capsys):
+    ape_linux.system_info()
+    captured = capsys.readouterr()
+    assert captured.out == f"{ape_linux.detect_system_context()}\n"
 
 
 def test_detect_system_context_returns_str_and_never_crashes():
