@@ -59,9 +59,11 @@ The flow in `ape_linux.py` is intentionally minimal:
    directly change what the tool outputs. `main()` then appends a system-context block
    (see below) so suggestions match the current machine.
 2a. `detect_system_context()` returns a best-effort, newline-separated `Key: value`
-   block describing the current machine (OS family + macOS/distro version, GNU-vs-BSD
-   userland, CPU arch, `$SHELL`, root-or-not, available package managers, and a probed
-   list of common tools). Two invariants: it **never raises** (every probe is guarded,
+   block describing the current machine (OS family + macOS/distro version, whether the
+   Linux host is WSL, GNU-vs-BSD userland, CPU arch, `$SHELL`, root-or-not, available
+   package managers, and a probed list of common tools). WSL is detected (Linux only)
+   from the `WSL_DISTRO_NAME`/`WSL_INTEROP` env vars or `"microsoft"` in
+   `platform.uname().release`. Two invariants: it **never raises** (every probe is guarded,
    so an unavailable API or missing file just omits that field instead of crashing at
    startup), and it **never includes identifying info** (no username, hostname, working
    directory, or home path). Everything is stdlib (`platform`, `os`, `shutil.which`) and
