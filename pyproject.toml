@@ -45,7 +45,7 @@ dev = [
 target-version = "py314"
 
 [tool.ruff.lint]
-select = ["F", "E", "W", "I001"]
+select = ["F", "E", "W", "I"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["ape_linux"]
