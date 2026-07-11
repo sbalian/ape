@@ -1,6 +1,7 @@
 # Lint with ruff.
 lint:
     uv run ruff check .
+    uv run ruff format --check .
 
 # Type check with ty.
 type-check:

@@ -25,7 +25,7 @@ This project uses [`uv`](https://docs.astral.sh/uv/) for everything, with
 [`just`](https://github.com/casey/just) wrapping the CI-relevant tasks.
 
 ```bash
-just lint                     # lint (uv run ruff check .)
+just lint                     # lint + format check (ruff check . && ruff format --check .)
 just type-check               # type check with ty (uv run ty check)
 just test                     # run all tests (uv run pytest)
 ```

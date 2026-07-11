@@ -139,9 +139,11 @@ def test_detect_system_context_omits_wsl_when_absent(monkeypatch):
     monkeypatch.delenv("WSL_DISTRO_NAME", raising=False)
     monkeypatch.delenv("WSL_INTEROP", raising=False)
     monkeypatch.setattr(
-        ape_linux.platform, "uname", lambda: platform.uname_result(
+        ape_linux.platform,
+        "uname",
+        lambda: platform.uname_result(
             "Linux", "host", "5.15.0-generic", "#1", "x86_64"
-        )
+        ),
     )
     context = ape_linux.detect_system_context()
     assert "WSL:" not in context
