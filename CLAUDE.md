@@ -54,10 +54,14 @@ The flow in `ape_linux.py` is intentionally minimal:
    `system_info()` function backs the `ape-system-info` console script; it just prints
    `detect_system_context()`.
 2. A hard-coded `system_prompt` (with few-shot examples) constrains the model to emit
-   **only** a runnable command — no Markdown fences — or `echo "Please try again."`
-   for anything off-topic. This prompt is the core product behavior; changes to it
-   directly change what the tool outputs. `main()` then appends a system-context block
-   (see below) so suggestions match the current machine.
+   a runnable command — no Markdown fences. Rather than a raw string, the agent uses a
+   **structured output** union, `Command | CannotHelp` (both `pydantic.BaseModel`s
+   defined in `ape_linux.py`): a `Command` carries the shell command in `.command`,
+   and a `CannotHelp` carries a short `.reason` for off-topic/unanswerable requests
+   (replacing the old `echo "Please try again."` string). This prompt is the core
+   product behavior; changes to it directly change what the tool outputs. `main()`
+   then appends a system-context block (see below) so suggestions match the current
+   machine.
 2a. `detect_system_context()` returns a best-effort, newline-separated `Key: value`
    block describing the current machine (OS family + macOS/distro version, whether the
    Linux host is WSL, GNU-vs-BSD userland, CPU arch, `$SHELL`, root-or-not, available
@@ -70,24 +74,38 @@ The flow in `ape_linux.py` is intentionally minimal:
    stat-based — no subprocesses — to keep startup fast. Notable guards:
    `platform.freedesktop_os_release()` raises `OSError` on macOS/minimal containers, and
    `os.geteuid()` is absent on non-Unix platforms (`hasattr` check).
-3. `call_llm()` wraps `pydantic_ai.Agent`, which is the provider abstraction. Models
-   are passed through verbatim in `provider:name` form (e.g. `anthropic:claude-sonnet-4-5`),
-   so Ape supports any provider Pydantic AI supports without provider-specific code.
-   The model is resolved solely from the `APE_MODEL` env var → the `DEFAULT_MODEL`
-   constant (`openai-chat:gpt-4.1`); there is no CLI override. Credentials come from
-   each provider's standard env var (e.g. `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`).
+3. `call_llm()` wraps `pydantic_ai.Agent`, which is the provider abstraction. It sets
+   `output_type=Command | CannotHelp`, so the agent returns one of those structured
+   objects instead of raw text (no string-sniffing in `main()`), and forwards a
+   `model_settings` mapping (or `None`). Models are passed through verbatim in
+   `provider:name` form (e.g. `anthropic:claude-sonnet-4-5`), so Ape supports any
+   provider Pydantic AI supports without provider-specific code. The model is resolved
+   solely from the `APE_MODEL` env var → the `DEFAULT_MODEL` constant
+   (`openai-chat:gpt-4.1`); there is no CLI override. The sampling temperature is
+   resolved by `resolve_model_settings()` from the `APE_TEMPERATURE` env var → the
+   `DEFAULT_TEMPERATURE` constant (`0.2`); the literal `"undefined"` (case-insensitive)
+   yields `None` so **no** `model_settings` are sent — deliberately, because a
+   hard-coded temperature crashes models that reject sampling settings (some reasoning
+   models, Claude Opus 4.7/4.8) — and an unparseable value exits `1` before any LLM
+   call. Credentials come from each provider's standard env var (e.g. `OPENAI_API_KEY`,
+   `ANTHROPIC_API_KEY`).
 4. Errors are flattened to one-line stderr messages, raising `SystemExit(1)` —
    `ModelHTTPError` reports status/message; any other exception (bad credentials,
    unknown provider) prints `str(error)`. There is no CLI framework swallowing
-   tracebacks, so exceptions are caught explicitly.
+   tracebacks, so exceptions are caught explicitly. On a successful call, a `Command`
+   prints its `.command` to stdout and exits 0, while a `CannotHelp` prints
+   `ape: <reason>` to **stderr** and exits `2` — a distinct code so callers can tell
+   "can't turn this into a command" apart from operational errors, and stdout stays
+   reserved for runnable commands.
 
 ## Testing
 
 `tests/test_app.py` drives `main()` directly via a `run()` helper that monkeypatches
 `sys.argv` and returns the `SystemExit` code (0 on the success path, since `main()`
 doesn't exit then), asserting on captured stdout/stderr with `capsys`. It monkeypatches
-`ape_linux.call_llm` so no real network/LLM calls happen. The `mockenv` fixture sets a
-dummy `OPENAI_API_KEY`.
+`ape_linux.call_llm` so no real network/LLM calls happen; the mock returns a `Command`
+(printed to stdout, exit 0) or a `CannotHelp` to exercise the refusal path (printed to
+stderr, exit `2`). The `mockenv` fixture sets a dummy `OPENAI_API_KEY`.
 
 `detect_system_context()` is covered by tests that assert it returns a string without
 crashing, reports the OS, and — importantly — excludes the current username, hostname,

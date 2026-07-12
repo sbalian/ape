@@ -53,16 +53,18 @@ Output:
 find projects/ -type d -name ".venv" -exec rm -rf {} +
 ```
 
-If you try to ask something unrelated to Linux commands:
+If you ask for something that isn't a Linux command task:
 
 ```bash
 ape Tell me about monkeys
 ```
 
-you should get:
+Ape prints a short explanation to standard error and exits with status `2`.
+Commands only ever go to standard output, so a refusal is never mistaken for one
+(and won't run if you pipe Ape into a shell):
 
 ```text
-echo "Please try again."
+ape: I can only help with Linux and Unix command-line tasks.
 ```
 
 You can change the model with the `APE_MODEL` environment variable. Models are
@@ -75,6 +77,16 @@ export APE_MODEL=anthropic:claude-sonnet-4-5
 ```
 
 If `APE_MODEL` is unset, the default `openai-chat:gpt-4.1` is used.
+
+You can set the sampling temperature with the `APE_TEMPERATURE` environment
+variable (default `0.2`). Some models — for example certain reasoning models —
+reject a temperature; set `APE_TEMPERATURE=undefined` to send none at all and let
+the model use its own default:
+
+```bash
+export APE_TEMPERATURE=0.7        # use a specific temperature
+export APE_TEMPERATURE=undefined  # send no temperature at all
+```
 
 ## System-aware suggestions
 

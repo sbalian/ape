@@ -28,7 +28,10 @@ def run(monkeypatch, argv):
 
 
 def test_app_for_suggestion(mockenv, monkeypatch, capsys):
-    monkeypatch.setattr("ape_linux.call_llm", lambda *args, **kwargs: "ls")
+    monkeypatch.setattr(
+        "ape_linux.call_llm",
+        lambda *args, **kwargs: ape_linux.Command(command="ls"),
+    )
     code = run(monkeypatch, ["list all the files"])
     captured = capsys.readouterr()
     assert captured.out == "ls\n"
@@ -39,9 +42,9 @@ def test_app_for_suggestion(mockenv, monkeypatch, capsys):
 def test_app_joins_multiple_args_into_query(mockenv, monkeypatch, capsys):
     captured_prompt = {}
 
-    def mockreturn(model, system_prompt, user_prompt):
+    def mockreturn(model, system_prompt, user_prompt, model_settings):
         captured_prompt["user"] = user_prompt
-        return "ls"
+        return ape_linux.Command(command="ls")
 
     monkeypatch.setattr("ape_linux.call_llm", mockreturn)
     run(monkeypatch, ["list", "all", "the", "files"])
@@ -55,13 +58,20 @@ def test_app_prints_help_and_exits_when_no_args(monkeypatch, capsys):
     assert code == 1
 
 
-def test_app_for_try_again_if_api_returns_none(mockenv, monkeypatch, capsys):
-    monkeypatch.setattr("ape_linux.call_llm", lambda *args, **kwargs: None)
+def test_app_reports_when_model_cannot_help(mockenv, monkeypatch, capsys):
+    monkeypatch.setattr(
+        "ape_linux.call_llm",
+        lambda *args, **kwargs: ape_linux.CannotHelp(
+            reason="I can only help with Linux and Unix command-line tasks."
+        ),
+    )
     code = run(monkeypatch, ["what is the capital of England?"])
     captured = capsys.readouterr()
-    assert captured.out == 'echo "Please try again."\n'
-    assert captured.err == ""
-    assert code == 0
+    # A refusal never lands on stdout (so it can't be mistaken for a command);
+    # it goes to stderr and exits with the dedicated code 2.
+    assert captured.out == ""
+    assert "I can only help with Linux and Unix command-line tasks." in captured.err
+    assert code == 2
 
 
 def test_app_with_api_error(mockenv, monkeypatch, capsys):
@@ -91,7 +101,7 @@ def test_app_uses_default_model_when_unset(mockenv, monkeypatch):
 
     def mockreturn(model, *args, **kwargs):
         captured["model"] = model
-        return "ls"
+        return ape_linux.Command(command="ls")
 
     monkeypatch.delenv("APE_MODEL", raising=False)
     monkeypatch.setattr("ape_linux.call_llm", mockreturn)
@@ -106,13 +116,71 @@ def test_app_uses_ape_model_env_var(mockenv, monkeypatch):
 
     def mockreturn(model, *args, **kwargs):
         captured["model"] = model
-        return "ls"
+        return ape_linux.Command(command="ls")
 
     monkeypatch.setenv("APE_MODEL", "anthropic:claude-sonnet-4-5")
     monkeypatch.setattr("ape_linux.call_llm", mockreturn)
     code = run(monkeypatch, ["list all the files"])
     assert captured["model"] == "anthropic:claude-sonnet-4-5"
     assert code == 0
+
+
+def test_app_uses_default_temperature_when_unset(mockenv, monkeypatch):
+    captured = {}
+
+    def mockreturn(model, system_prompt, user_prompt, model_settings):
+        captured["settings"] = model_settings
+        return ape_linux.Command(command="ls")
+
+    monkeypatch.delenv("APE_TEMPERATURE", raising=False)
+    monkeypatch.setattr("ape_linux.call_llm", mockreturn)
+    code = run(monkeypatch, ["list all the files"])
+    assert captured["settings"] == {"temperature": ape_linux.DEFAULT_TEMPERATURE}
+    assert ape_linux.DEFAULT_TEMPERATURE == 0.2
+    assert code == 0
+
+
+def test_app_uses_ape_temperature_env_var(mockenv, monkeypatch):
+    captured = {}
+
+    def mockreturn(model, system_prompt, user_prompt, model_settings):
+        captured["settings"] = model_settings
+        return ape_linux.Command(command="ls")
+
+    monkeypatch.setenv("APE_TEMPERATURE", "0.7")
+    monkeypatch.setattr("ape_linux.call_llm", mockreturn)
+    code = run(monkeypatch, ["list all the files"])
+    assert captured["settings"] == {"temperature": 0.7}
+    assert code == 0
+
+
+def test_app_undefined_temperature_sends_no_settings(mockenv, monkeypatch):
+    captured = {}
+
+    def mockreturn(model, system_prompt, user_prompt, model_settings):
+        captured["settings"] = model_settings
+        return ape_linux.Command(command="ls")
+
+    # "undefined" (any case) means: send no model_settings at all.
+    monkeypatch.setenv("APE_TEMPERATURE", "Undefined")
+    monkeypatch.setattr("ape_linux.call_llm", mockreturn)
+    code = run(monkeypatch, ["list all the files"])
+    assert captured["settings"] is None
+    assert code == 0
+
+
+def test_app_invalid_temperature_exits_before_llm(mockenv, monkeypatch, capsys):
+    monkeypatch.setenv("APE_TEMPERATURE", "hot")
+    # An invalid temperature must be caught before any LLM call is attempted.
+    monkeypatch.setattr(
+        "ape_linux.call_llm",
+        lambda *args, **kwargs: pytest.fail("call_llm should not be called"),
+    )
+    code = run(monkeypatch, ["list all the files"])
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "APE_TEMPERATURE" in captured.err
+    assert code == 1
 
 
 def test_system_info_entry_point(capsys):
