@@ -121,4 +121,34 @@ line.
   uses 3.14 (`.python-version`).
 - Version is read at runtime from package metadata (`importlib.metadata.version`), so
   the single source of truth is `pyproject.toml`'s `version`. Publishing is tag-driven
-  (`.github/workflows/publish.yaml`).
+  (`.github/workflows/publish.yaml`). See **Releasing** below for the full flow.
+
+## Releasing
+
+Releases are cut from `main` and published to PyPI by the tag-driven `publish.yaml`
+workflow, which runs `uv build` + `uv publish` on **any** pushed tag. Tags are **bare
+version numbers with no `v` prefix** (e.g. `0.4.6`) and must match `pyproject.toml`'s
+`version`. Follow these steps (this is the process that worked for `0.4.6`):
+
+1. **Bump the version** in `pyproject.toml`, then `uv sync` so `uv.lock` records the new
+   local package version.
+2. **Verify locally**: `just lint`, `just type-check`, and `just test` must all pass.
+3. **Branch + commit + push**: create a `release-<version>` branch, commit the change
+   (bundle whatever feature work is shipping in the release), and push it.
+4. **Open a PR** against `main` (`gh pr create`) and wait for CI to go green with
+   `gh pr checks <n> --watch` (the `Tests` workflow runs `Lint` plus the 3.10–3.13 ×
+   ubuntu/macos test matrix — nine checks total).
+5. **Squash-merge** once green: `gh pr merge <n> --squash --delete-branch`.
+6. **Tag on `main`**: `git checkout main && git pull`, then `git tag <version> &&
+   git push origin <version>`. Pushing the tag is what triggers `publish.yaml` → PyPI.
+7. **Create the GitHub release**: `gh release create <version> --generate-notes
+   --verify-tag`. This reuses the already-pushed tag and fills the body with GitHub's
+   auto-generated changelog.
+8. **Verify the publish**: watch the run (`gh run watch <id> --exit-status`) and confirm
+   PyPI serves the new version, e.g. `uv run --isolated --no-project --refresh-package
+   ape-linux --with ape-linux python -c "import importlib.metadata as m;
+   print(m.version('ape-linux'))"`.
+
+Note on release notes: `--generate-notes` diffs against the previous release tag, so any
+PR merged after that tag is listed — including ones that never got their own release.
+That is expected, not a bug; leave the auto-generated notes as-is unless asked.
