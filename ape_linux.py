@@ -4,11 +4,14 @@ import os
 import platform
 import shutil
 import sys
+from typing import cast
 
-from pydantic_ai import Agent
+from pydantic import BaseModel
+from pydantic_ai import Agent, ModelSettings
 from pydantic_ai.exceptions import ModelHTTPError
 
 DEFAULT_MODEL = "openai-chat:gpt-4.1"
+DEFAULT_TEMPERATURE = 0.2
 
 HELP = """\
 ape — AI for Linux commands.
@@ -26,17 +29,69 @@ The model is read from the APE_MODEL environment variable in provider:name form
 https://ai.pydantic.dev/models/. Credentials come from each provider's standard
 environment variable (e.g. OPENAI_API_KEY, ANTHROPIC_API_KEY).
 
+The sampling temperature is read from APE_TEMPERATURE (default {temperature}). Set
+it to "undefined" to send no temperature at all, which some models require.
+
 Run `ape-system-info` to print the detected system context sent to the model.\
-""".format(default=DEFAULT_MODEL)
+""".format(default=DEFAULT_MODEL, temperature=DEFAULT_TEMPERATURE)
 
 
-def call_llm(model: str, system_prompt: str, user_prompt: str) -> str | None:
+class Command(BaseModel):
+    """A shell command (or && / \\-chained commands) for the requested task."""
+
+    command: str
+
+
+class CannotHelp(BaseModel):
+    """A refusal: the request is not a Linux/Unix task that maps to a command."""
+
+    reason: str
+
+
+def call_llm(
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    model_settings: ModelSettings | None,
+) -> Command | CannotHelp:
     agent = Agent(
         model,
         system_prompt=system_prompt,
-        model_settings={"temperature": 0.2},
+        output_type=Command | CannotHelp,
+        # None means no settings are sent (see resolve_model_settings), so the model
+        # uses its own defaults — needed for models that reject a temperature.
+        model_settings=model_settings,
     )
-    return agent.run_sync(user_prompt).output
+    # `output_type` makes the agent return a `Command | CannotHelp` at runtime, but
+    # the type checker (ty) doesn't resolve the union through pydantic-ai's overloads
+    # and infers `str`, so restate the type here. (Pyright resolves it without a cast.)
+    return cast(Command | CannotHelp, agent.run_sync(user_prompt).output)
+
+
+def resolve_model_settings() -> ModelSettings | None:
+    """Resolve model settings from the APE_TEMPERATURE environment variable.
+
+    Unset (or empty) uses the default temperature. The literal ``"undefined"``
+    (case-insensitive) returns ``None`` so that no ``model_settings`` — and thus no
+    temperature — is sent to the model; this is what models that reject sampling
+    settings (e.g. some reasoning models) need. Any other value must parse as a
+    float, otherwise the program exits with a one-line error.
+    """
+    raw = os.environ.get("APE_TEMPERATURE")
+    if raw is None or not raw.strip():
+        return {"temperature": DEFAULT_TEMPERATURE}
+    value = raw.strip()
+    if value.lower() == "undefined":
+        return None
+    try:
+        return {"temperature": float(value)}
+    except ValueError:
+        print(
+            f"ape: invalid APE_TEMPERATURE {value!r}: expected a number or "
+            '"undefined".',
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
 
 
 def detect_system_context() -> str:
@@ -188,44 +243,45 @@ def main() -> None:
     # The model is read from APE_MODEL, falling back to the default.
     model = os.environ.get("APE_MODEL") or DEFAULT_MODEL
 
+    # The sampling temperature is read from APE_TEMPERATURE (see
+    # resolve_model_settings); an invalid value exits here before any LLM call.
+    model_settings = resolve_model_settings()
+
     system_prompt = """\
-    You are a Linux command assistant. You will be asked a question about how to
-    perform a task in Linux or Unix-like operating systems. You should only include
-    in your answer the command or commands to perform the task. If you do not know how
-    to perform the task, output "echo "Please try again."".
+    You are a Linux command assistant. You will be asked how to perform a task on
+    Linux or a Unix-like operating system. Respond with one of two structured
+    outputs:
 
-    It is important that you do not output commands enclosed in ``` ``` Markdown
-    blocks. For example, do not output:
+    - Command: the shell command (or commands) that perform the task, when the
+      request is a Linux/Unix task.
+    - CannotHelp: a short reason, when the request is not something you can turn into
+      a shell command (for example a general-knowledge question or anything
+      off-topic).
 
-    ```sh
-    cd projects
-    ls
-    ```
-
-    Instead, your output should be a command that is to be entered directly into the
-    command line. For the example above this is: cd projects && ls
-
-    You are also allowed to use \\ for command continuation.
+    For a Command, put something that can be entered directly into the command line
+    in the `command` field. Do not wrap it in ``` ``` Markdown code fences. Chain
+    multiple steps with && (for example: cd projects && ls) and use \\ for command
+    continuation.
 
     Here are a few examples.
 
     Question: List all the files and directories in projects in my home directory
-    Answer: ls ~/projects
+    Command: ls ~/projects
 
     Question: Navigate to projects and list its contents
-    Answer: cd projects && ls
+    Command: cd projects && ls
 
     Question: What is my username?
-    Answer: whoami
+    Command: whoami
 
     Question: Find all files with the extension .txt under the current working directory
-    Answer: find . -name "*.txt"
+    Command: find . -name "*.txt"
 
-    Question: What is the captial of France?
-    Answer: echo "Please try again."
+    Question: What is the capital of France?
+    CannotHelp: I can only help with Linux and Unix command-line tasks.
 
     Question: Tell me a story
-    Answer: echo "Please try again.\""""
+    CannotHelp: I can only help with Linux and Unix command-line tasks."""
 
     # Append best-effort facts about the current machine so the model can
     # tailor flags, package managers and tool choices to this environment.
@@ -244,7 +300,7 @@ def main() -> None:
     Answer:"""
 
     try:
-        answer = call_llm(model, system_prompt, user_prompt)
+        result = call_llm(model, system_prompt, user_prompt, model_settings)
     except ModelHTTPError as error:
         print(f"{error.status_code} error: {error.message}", file=sys.stderr)
         raise SystemExit(1)
@@ -254,6 +310,10 @@ def main() -> None:
         print(str(error), file=sys.stderr)
         raise SystemExit(1)
 
-    if answer is None:
-        answer = 'echo "Please try again."'
-    print(answer)
+    # The agent returns a structured result: either a runnable command or a
+    # refusal. A refusal goes to stderr and exits 2 (distinct from the code-1
+    # operational errors above) so it is never mistaken for a command on stdout.
+    if isinstance(result, CannotHelp):
+        print(f"ape: {result.reason}", file=sys.stderr)
+        raise SystemExit(2)
+    print(result.command)
