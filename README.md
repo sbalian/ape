@@ -12,8 +12,7 @@ Output:
 find ~/user/projects -type f -name "*attention*.pdf" > important_files.txt && mv important_files.txt ~/Documents/
 ```
 
-Ape works with any provider supported by [Pydantic AI](https://ai.pydantic.dev/models/)
-— OpenAI, Anthropic, Google, Groq, Mistral and more.
+Ape works with the following providers supported by [Pydantic AI](https://ai.pydantic.dev/models/): OpenAI, Anthropic, Google, Groq, and Mistral.
 
 To install ([`uv`](https://docs.astral.sh/uv/getting-started/installation/) recommended):
 
