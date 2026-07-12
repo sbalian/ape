@@ -20,13 +20,20 @@ To install ([`uv`](https://docs.astral.sh/uv/getting-started/installation/) reco
 uv tool install ape-linux
 ```
 
-Next, set the API key for your provider using its standard environment variable.
-For example:
+Next, choose a model with `APE_MODEL` in `provider:name` form (see the
+[Pydantic AI docs](https://ai.pydantic.dev/models/) for the supported providers and
+models) and set your provider API key in `APE_API_KEY`. Ape infers the provider from
+the model name and passes this key straight to it, so `APE_API_KEY` must be a key for
+that model's provider. Ape uses its own key variable rather than a provider's standard
+one (like `OPENAI_API_KEY`), so setting it up for Ape doesn't affect other tools on
+your system:
 
 ```bash
-export OPENAI_API_KEY=key      # for OpenAI models
-export ANTHROPIC_API_KEY=key   # for Anthropic models
+export APE_MODEL=openai:gpt-5.4-nano
+export APE_API_KEY=key
 ```
+
+Both are required.
 
 To run:
 
@@ -65,17 +72,6 @@ Commands only ever go to standard output, so a refusal is never mistaken for one
 ```text
 ape: I can only help with Linux and Unix command-line tasks.
 ```
-
-You can change the model with the `APE_MODEL` environment variable. Models are
-specified in `provider:name` form.
-See [here](https://ai.pydantic.dev/models/) for the supported providers and models.
-For example:
-
-```bash
-export APE_MODEL=anthropic:claude-sonnet-4-5
-```
-
-If `APE_MODEL` is unset, the default `openai-chat:gpt-4.1` is used.
 
 You can set the sampling temperature with the `APE_TEMPERATURE` environment
 variable (default `0.2`). Some models — for example certain reasoning models —

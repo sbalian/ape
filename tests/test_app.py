@@ -5,13 +5,15 @@ import socket
 
 import pytest
 from pydantic_ai.exceptions import ModelHTTPError
+from pydantic_ai.models.test import TestModel
 
 import ape_linux
 
 
 @pytest.fixture
 def mockenv(monkeypatch):
-    monkeypatch.setenv("OPENAI_API_KEY", "key")
+    monkeypatch.setenv("APE_API_KEY", "key")
+    monkeypatch.setenv("APE_MODEL", "openai:gpt-4.1")
 
 
 def run(monkeypatch, argv):
@@ -42,7 +44,7 @@ def test_app_for_suggestion(mockenv, monkeypatch, capsys):
 def test_app_joins_multiple_args_into_query(mockenv, monkeypatch, capsys):
     captured_prompt = {}
 
-    def mockreturn(model, system_prompt, user_prompt, model_settings):
+    def mockreturn(model, api_key, system_prompt, user_prompt, model_settings):
         captured_prompt["user"] = user_prompt
         return ape_linux.Command(command="ls")
 
@@ -76,39 +78,98 @@ def test_app_reports_when_model_cannot_help(mockenv, monkeypatch, capsys):
 
 def test_app_with_api_error(mockenv, monkeypatch, capsys):
     def mockreturn(*args, **kwargs):
-        raise ModelHTTPError(
-            status_code=500, model_name="openai-chat:gpt-4o", body=None
-        )
+        raise ModelHTTPError(status_code=500, model_name="openai:gpt-4o", body=None)
 
     monkeypatch.setattr("ape_linux.call_llm", mockreturn)
     code = run(monkeypatch, ["list all the files"])
     captured = capsys.readouterr()
     assert captured.out == ""
+    assert code == 1
+
+
+def test_app_with_unexpected_error(mockenv, monkeypatch, capsys):
+    # A non-HTTP error (bad credentials, unknown provider, ...) is flattened to a
+    # one-line stderr message and exits 1, rather than surfacing a traceback.
+    def mockreturn(*args, **kwargs):
+        raise RuntimeError("something broke")
+
+    monkeypatch.setattr("ape_linux.call_llm", mockreturn)
+    code = run(monkeypatch, ["list all the files"])
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "something broke" in captured.err
     assert code == 1
 
 
 def test_app_with_no_api_key(mockenv, monkeypatch, capsys):
-    monkeypatch.delenv("OPENAI_API_KEY")
+    # With APE_API_KEY unset (but APE_MODEL present via mockenv), ape must exit
+    # before ever reaching the LLM.
+    monkeypatch.delenv("APE_API_KEY", raising=False)
+    monkeypatch.setattr(
+        "ape_linux.call_llm",
+        lambda *args, **kwargs: pytest.fail("call_llm should not be called"),
+    )
     code = run(monkeypatch, ["list all the files"])
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert captured.err != ""
+    assert "APE_API_KEY" in captured.err
     assert code == 1
 
 
-def test_app_uses_default_model_when_unset(mockenv, monkeypatch):
+def test_app_with_blank_api_key(mockenv, monkeypatch, capsys):
+    # A whitespace-only APE_API_KEY is treated as unset: exit before the LLM.
+    monkeypatch.setenv("APE_API_KEY", "   ")
+    monkeypatch.setattr(
+        "ape_linux.call_llm",
+        lambda *args, **kwargs: pytest.fail("call_llm should not be called"),
+    )
+    code = run(monkeypatch, ["list all the files"])
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "APE_API_KEY" in captured.err
+    assert code == 1
+
+
+def test_app_passes_api_key_to_call_llm(mockenv, monkeypatch):
     captured = {}
 
-    def mockreturn(model, *args, **kwargs):
-        captured["model"] = model
+    def mockreturn(model, api_key, *args, **kwargs):
+        captured["api_key"] = api_key
         return ape_linux.Command(command="ls")
 
-    monkeypatch.delenv("APE_MODEL", raising=False)
+    monkeypatch.setenv("APE_API_KEY", "secret-key")
     monkeypatch.setattr("ape_linux.call_llm", mockreturn)
     code = run(monkeypatch, ["list all the files"])
-    assert captured["model"] == ape_linux.DEFAULT_MODEL
-    assert ape_linux.DEFAULT_MODEL == "openai-chat:gpt-4.1"
+    assert captured["api_key"] == "secret-key"
     assert code == 0
+
+
+def test_app_with_no_model(mockenv, monkeypatch, capsys):
+    # With APE_MODEL unset, ape must exit before ever reaching the LLM.
+    monkeypatch.delenv("APE_MODEL", raising=False)
+    monkeypatch.setattr(
+        "ape_linux.call_llm",
+        lambda *args, **kwargs: pytest.fail("call_llm should not be called"),
+    )
+    code = run(monkeypatch, ["list all the files"])
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "APE_MODEL" in captured.err
+    assert code == 1
+
+
+def test_app_with_blank_model(mockenv, monkeypatch, capsys):
+    # A whitespace-only APE_MODEL is treated as unset: exit before the LLM.
+    monkeypatch.setenv("APE_MODEL", "   ")
+    monkeypatch.setattr(
+        "ape_linux.call_llm",
+        lambda *args, **kwargs: pytest.fail("call_llm should not be called"),
+    )
+    code = run(monkeypatch, ["list all the files"])
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "APE_MODEL" in captured.err
+    assert code == 1
 
 
 def test_app_uses_ape_model_env_var(mockenv, monkeypatch):
@@ -128,7 +189,7 @@ def test_app_uses_ape_model_env_var(mockenv, monkeypatch):
 def test_app_uses_default_temperature_when_unset(mockenv, monkeypatch):
     captured = {}
 
-    def mockreturn(model, system_prompt, user_prompt, model_settings):
+    def mockreturn(model, api_key, system_prompt, user_prompt, model_settings):
         captured["settings"] = model_settings
         return ape_linux.Command(command="ls")
 
@@ -143,7 +204,7 @@ def test_app_uses_default_temperature_when_unset(mockenv, monkeypatch):
 def test_app_uses_ape_temperature_env_var(mockenv, monkeypatch):
     captured = {}
 
-    def mockreturn(model, system_prompt, user_prompt, model_settings):
+    def mockreturn(model, api_key, system_prompt, user_prompt, model_settings):
         captured["settings"] = model_settings
         return ape_linux.Command(command="ls")
 
@@ -157,7 +218,7 @@ def test_app_uses_ape_temperature_env_var(mockenv, monkeypatch):
 def test_app_undefined_temperature_sends_no_settings(mockenv, monkeypatch):
     captured = {}
 
-    def mockreturn(model, system_prompt, user_prompt, model_settings):
+    def mockreturn(model, api_key, system_prompt, user_prompt, model_settings):
         captured["settings"] = model_settings
         return ape_linux.Command(command="ls")
 
@@ -181,6 +242,43 @@ def test_app_invalid_temperature_exits_before_llm(mockenv, monkeypatch, capsys):
     assert captured.out == ""
     assert "APE_TEMPERATURE" in captured.err
     assert code == 1
+
+
+def test_call_llm_returns_structured_output(monkeypatch):
+    # Exercise the real call_llm (normally mocked) without a network call by swapping in
+    # Pydantic AI's TestModel, which drives the agent and yields structured output
+    # offline. This covers the infer_model/Agent wiring and the output cast.
+    monkeypatch.setattr(
+        "ape_linux.infer_model", lambda model, provider_factory: TestModel()
+    )
+    result = ape_linux.call_llm(
+        "openai:gpt-4.1", "key", "system", "user", {"temperature": 0.2}
+    )
+    assert isinstance(result, ape_linux.Command)
+    assert isinstance(result.command, str)
+
+
+def test_build_provider_injects_key_without_standard_env_var(monkeypatch):
+    # build_provider constructs the inferred provider with our key injected directly,
+    # so the provider's standard credential variable is neither needed nor read.
+    # Constructing a provider is offline — no request is made until the agent runs.
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    openai_provider = ape_linux.build_provider("openai", "injected-key")
+    assert openai_provider.name == "openai"
+    assert openai_provider.client.api_key == "injected-key"
+
+    anthropic_provider = ape_linux.build_provider("anthropic", "another-key")
+    assert anthropic_provider.name == "anthropic"
+    assert anthropic_provider.client.api_key == "another-key"
+
+
+def test_build_provider_unknown_provider_raises():
+    # An unrecognized provider name surfaces as ValueError (which main() flattens to a
+    # one-line error), rather than silently building the wrong provider.
+    with pytest.raises(ValueError):
+        ape_linux.build_provider("not-a-real-provider", "key")
 
 
 def test_system_info_entry_point(capsys):
@@ -221,6 +319,40 @@ def test_detect_system_context_reports_operating_system():
     # platform.system() is non-empty on every supported platform.
     context = ape_linux.detect_system_context()
     assert "Operating system:" in context
+
+
+def test_detect_system_context_reports_distribution(monkeypatch):
+    # On Linux, the distribution name from os-release is reported.
+    monkeypatch.setattr(ape_linux.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(
+        ape_linux.platform,
+        "freedesktop_os_release",
+        lambda: {"PRETTY_NAME": "Ubuntu 22.04.3 LTS"},
+    )
+    context = ape_linux.detect_system_context()
+    assert "Distribution: Ubuntu 22.04.3 LTS" in context
+
+
+def test_detect_system_context_never_raises_when_probe_fails(monkeypatch):
+    # The "never raises" invariant: when a probe raises, that field is omitted and the
+    # function still returns a string rather than crashing at startup.
+    monkeypatch.setattr(ape_linux.platform, "system", lambda: "Darwin")
+
+    def boom(*args, **kwargs):
+        raise OSError("probe failed")
+
+    monkeypatch.setattr(ape_linux.platform, "mac_ver", boom)
+    context = ape_linux.detect_system_context()
+    assert isinstance(context, str)
+    assert "macOS version:" not in context
+
+
+def test_detect_system_context_reports_root_privileges(monkeypatch):
+    # The root branch changes the guidance (sudo not required); its non-root twin is
+    # covered by the real host running these tests unprivileged.
+    monkeypatch.setattr(ape_linux.os, "geteuid", lambda: 0)
+    context = ape_linux.detect_system_context()
+    assert "Privileges: root (sudo not required)" in context
 
 
 def test_detect_system_context_excludes_identifying_info():

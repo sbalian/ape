@@ -4,13 +4,16 @@ import os
 import platform
 import shutil
 import sys
-from typing import cast
+from collections.abc import Callable
+from functools import partial
+from typing import Any, cast
 
 from pydantic import BaseModel
 from pydantic_ai import Agent, ModelSettings
 from pydantic_ai.exceptions import ModelHTTPError
+from pydantic_ai.models import infer_model
+from pydantic_ai.providers import Provider, infer_provider_class
 
-DEFAULT_MODEL = "openai-chat:gpt-4.1"
 DEFAULT_TEMPERATURE = 0.2
 
 HELP = """\
@@ -24,16 +27,18 @@ Example:
     ape "Create a symbolic link named 'win' pointing to /mnt/c/Users/jdoe"
     ln -s /mnt/c/Users/jdoe win
 
-The model is read from the APE_MODEL environment variable in provider:name form
-(e.g. anthropic:claude-sonnet-4-5), falling back to {default}. See
-https://ai.pydantic.dev/models/. Credentials come from each provider's standard
-environment variable (e.g. OPENAI_API_KEY, ANTHROPIC_API_KEY).
+The model is required and read from the APE_MODEL environment variable in
+provider:name form (e.g. anthropic:claude-sonnet-4-5). See
+https://ai.pydantic.dev/models/. Set your provider API key in APE_API_KEY: Ape
+infers the provider from the model name and passes this key straight to it, so
+you don't have to set a provider's standard variable (e.g. OPENAI_API_KEY) that
+other tools on your system also read.
 
 The sampling temperature is read from APE_TEMPERATURE (default {temperature}). Set
 it to "undefined" to send no temperature at all, which some models require.
 
 Run `ape-system-info` to print the detected system context sent to the model.\
-""".format(default=DEFAULT_MODEL, temperature=DEFAULT_TEMPERATURE)
+""".format(temperature=DEFAULT_TEMPERATURE)
 
 
 class Command(BaseModel):
@@ -48,14 +53,39 @@ class CannotHelp(BaseModel):
     reason: str
 
 
+def build_provider(provider_name: str, api_key: str) -> Provider[Any]:
+    """Construct the Pydantic AI provider named by ``provider_name`` with ``api_key``.
+
+    Used (with the key bound via ``functools.partial``) as the ``provider_factory`` for
+    ``infer_model`` so Ape injects its own ``APE_API_KEY`` straight into the provider
+    rather than letting Pydantic AI read the provider's standard credential env var.
+    This stays provider-agnostic: any provider whose class accepts an ``api_key`` works
+    without provider-specific code. A provider that lacks an ``api_key`` parameter
+    raises at call time (surfaced as a one-line error), which is correct — APE_API_KEY
+    only fits key-based providers.
+    """
+    # infer_provider_class returns the abstract base type[Provider], whose __init__
+    # takes no arguments; the concrete `api_key` parameter lives on each subclass and
+    # is lost through the return type. Both ty and pyright reject the call without this
+    # cast to a callable that accepts it (unlike the output_type cast below, which is a
+    # ty-only workaround).
+    provider_class = cast(
+        Callable[..., Provider[Any]], infer_provider_class(provider_name)
+    )
+    return provider_class(api_key=api_key)
+
+
 def call_llm(
     model: str,
+    api_key: str,
     system_prompt: str,
     user_prompt: str,
     model_settings: ModelSettings | None,
 ) -> Command | CannotHelp:
     agent = Agent(
-        model,
+        # infer_model parses the provider from the `provider:name` prefix;
+        # build_provider (with the key bound) constructs it with our APE_API_KEY.
+        infer_model(model, provider_factory=partial(build_provider, api_key=api_key)),
         system_prompt=system_prompt,
         output_type=Command | CannotHelp,
         # None means no settings are sent (see resolve_model_settings), so the model
@@ -66,6 +96,27 @@ def call_llm(
     # the type checker (ty) doesn't resolve the union through pydantic-ai's overloads
     # and infers `str`, so restate the type here. (Pyright resolves it without a cast.)
     return cast(Command | CannotHelp, agent.run_sync(user_prompt).output)
+
+
+def resolve_model() -> str:
+    """Resolve the model from the APE_MODEL environment variable.
+
+    The model is required and given in ``provider:name`` form (e.g.
+    ``anthropic:claude-sonnet-4-5``); Ape has no built-in default, so that the
+    provider is always explicit (it also determines which API `resolve_api_key`'s key
+    is sent to). If unset or empty, the program exits with a one-line error before any
+    LLM call.
+    """
+    model = os.environ.get("APE_MODEL")
+    if model is None or not model.strip():
+        print(
+            "ape: APE_MODEL is not set. Set it to a model in provider:name form, "
+            "e.g. anthropic:claude-sonnet-4-5 (run `ape` with no arguments for "
+            "details).",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    return model
 
 
 def resolve_model_settings() -> ModelSettings | None:
@@ -92,6 +143,26 @@ def resolve_model_settings() -> ModelSettings | None:
             file=sys.stderr,
         )
         raise SystemExit(1)
+
+
+def resolve_api_key() -> str:
+    """Resolve the provider API key from the APE_API_KEY environment variable.
+
+    Ape reads its own ``APE_API_KEY`` rather than each provider's standard variable
+    (e.g. ``OPENAI_API_KEY``) so that configuring Ape doesn't force a globally named
+    key that other tools on the system also pick up. The key is passed straight to the
+    provider inferred from the model name (see ``call_llm``). If it is unset or empty,
+    the program exits with a one-line error before any LLM call.
+    """
+    api_key = os.environ.get("APE_API_KEY")
+    if api_key is None or not api_key.strip():
+        print(
+            "ape: APE_API_KEY is not set. Set it to your provider API key "
+            "(run `ape` with no arguments for details).",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    return api_key
 
 
 def detect_system_context() -> str:
@@ -240,8 +311,13 @@ def main() -> None:
         raise SystemExit(1)
     query = " ".join(args)
 
-    # The model is read from APE_MODEL, falling back to the default.
-    model = os.environ.get("APE_MODEL") or DEFAULT_MODEL
+    # The model is read from APE_MODEL (see resolve_model); a missing model exits
+    # here before any LLM call.
+    model = resolve_model()
+
+    # The API key is read from APE_API_KEY (see resolve_api_key); a missing key
+    # exits here before any LLM call.
+    api_key = resolve_api_key()
 
     # The sampling temperature is read from APE_TEMPERATURE (see
     # resolve_model_settings); an invalid value exits here before any LLM call.
@@ -300,7 +376,7 @@ def main() -> None:
     Answer:"""
 
     try:
-        result = call_llm(model, system_prompt, user_prompt, model_settings)
+        result = call_llm(model, api_key, system_prompt, user_prompt, model_settings)
     except ModelHTTPError as error:
         print(f"{error.status_code} error: {error.message}", file=sys.stderr)
         raise SystemExit(1)
