@@ -77,18 +77,29 @@ The flow in `ape_linux.py` is intentionally minimal:
 3. `call_llm()` wraps `pydantic_ai.Agent`, which is the provider abstraction. It sets
    `output_type=Command | CannotHelp`, so the agent returns one of those structured
    objects instead of raw text (no string-sniffing in `main()`), and forwards a
-   `model_settings` mapping (or `None`). Models are passed through verbatim in
-   `provider:name` form (e.g. `anthropic:claude-sonnet-4-5`), so Ape supports any
-   provider Pydantic AI supports without provider-specific code. The model is resolved
-   solely from the `APE_MODEL` env var → the `DEFAULT_MODEL` constant
-   (`openai-chat:gpt-4.1`); there is no CLI override. The sampling temperature is
-   resolved by `resolve_model_settings()` from the `APE_TEMPERATURE` env var → the
+   `model_settings` mapping (or `None`). The model string in `provider:name` form
+   (e.g. `anthropic:claude-sonnet-4-5`) is turned into a model object via
+   `pydantic_ai.models.infer_model()`, to which `call_llm()` passes a custom
+   `provider_factory` that builds the inferred provider with
+   `infer_provider_class(provider_name)(api_key=api_key)` — i.e. it injects Ape's own
+   API key straight into the provider rather than letting Pydantic AI read the
+   provider's standard credential env var. This stays provider-agnostic (any provider
+   whose class accepts an `api_key` works with no provider-specific code); a provider
+   that lacks an `api_key` parameter raises at call time and surfaces as a one-line
+   error. The model is resolved by `resolve_model()` solely from the **required**
+   `APE_MODEL` env var (in `provider:name` form); there is no built-in default and no
+   CLI override, so the provider is always explicit — a missing/empty `APE_MODEL` exits
+   `1` before any LLM call. The API key is resolved by `resolve_api_key()` from the
+   **`APE_API_KEY`** env var — Ape's own variable, deliberately *not* a provider's
+   standard one (e.g. `OPENAI_API_KEY`), so configuring Ape doesn't force a globally
+   named key that other tools also read; a missing/empty `APE_API_KEY` likewise exits
+   `1` before any LLM call. The sampling temperature
+   is resolved by `resolve_model_settings()` from the `APE_TEMPERATURE` env var → the
    `DEFAULT_TEMPERATURE` constant (`0.2`); the literal `"undefined"` (case-insensitive)
    yields `None` so **no** `model_settings` are sent — deliberately, because a
    hard-coded temperature crashes models that reject sampling settings (some reasoning
    models, Claude Opus 4.7/4.8) — and an unparseable value exits `1` before any LLM
-   call. Credentials come from each provider's standard env var (e.g. `OPENAI_API_KEY`,
-   `ANTHROPIC_API_KEY`).
+   call.
 4. Errors are flattened to one-line stderr messages, raising `SystemExit(1)` —
    `ModelHTTPError` reports status/message; any other exception (bad credentials,
    unknown provider) prints `str(error)`. There is no CLI framework swallowing
@@ -105,7 +116,17 @@ The flow in `ape_linux.py` is intentionally minimal:
 doesn't exit then), asserting on captured stdout/stderr with `capsys`. It monkeypatches
 `ape_linux.call_llm` so no real network/LLM calls happen; the mock returns a `Command`
 (printed to stdout, exit 0) or a `CannotHelp` to exercise the refusal path (printed to
-stderr, exit `2`). The `mockenv` fixture sets a dummy `OPENAI_API_KEY`.
+stderr, exit `2`). The `mockenv` fixture sets a dummy `APE_API_KEY` and `APE_MODEL`
+(both required). Tests that assert on `call_llm`'s arguments take its signature
+`(model, api_key, system_prompt, user_prompt, model_settings)`; a missing **or
+blank/whitespace** `APE_MODEL` or `APE_API_KEY` is each checked to exit `1` before
+`call_llm` is ever reached.
+
+`build_provider()` is covered directly (not through `main()`): tests construct the
+`openai` and `anthropic` providers with the standard credential vars deleted and assert
+the injected key lands on `provider.client.api_key` (proving the standard var is neither
+needed nor read), and that an unknown provider name raises `ValueError`. Building a
+provider is offline, so these make no network calls.
 
 `detect_system_context()` is covered by tests that assert it returns a string without
 crashing, reports the OS, and — importantly — excludes the current username, hostname,
