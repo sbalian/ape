@@ -75,9 +75,16 @@ The flow in `ape_linux.py` is intentionally minimal:
    `platform.freedesktop_os_release()` raises `OSError` on macOS/minimal containers, and
    `os.geteuid()` is absent on non-Unix platforms (`hasattr` check).
 3. `call_llm()` wraps `pydantic_ai.Agent`, which is the provider abstraction. It sets
-   `output_type=Command | CannotHelp`, so the agent returns one of those structured
+   `output_type=[Command, CannotHelp]`, so the agent returns one of those structured
    objects instead of raw text (no string-sniffing in `main()`), and forwards a
-   `model_settings` mapping (or `None`). The model string in `provider:name` form
+   `model_settings` mapping (or `None`). The agent is constructed as
+   `Agent[object, Command | CannotHelp](...)` and `output_type` uses Pydantic AI's
+   **sequence** form rather than the equivalent `Command | CannotHelp` union: both
+   spellings build identical output tools, but ty types a `X | Y` *value* as a
+   `types.UnionType` instance, which matches no `Agent.__init__` overload and silently
+   degrades the output type to `str`. Written this way, ty and pyright both infer
+   `Command | CannotHelp`, so no `ty: ignore` or `cast` on the result is needed —
+   keep this spelling. The model string in `provider:name` form
    (e.g. `anthropic:claude-sonnet-4-5`) is turned into a model object via
    `pydantic_ai.models.infer_model()`, to which `call_llm()` passes a custom
    `provider_factory` that builds the inferred provider with

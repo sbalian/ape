@@ -67,8 +67,7 @@ def build_provider(provider_name: str, api_key: str) -> Provider[Any]:
     # infer_provider_class returns the abstract base type[Provider], whose __init__
     # takes no arguments; the concrete `api_key` parameter lives on each subclass and
     # is lost through the return type. Both ty and pyright reject the call without this
-    # cast to a callable that accepts it (unlike the output_type cast below, which is a
-    # ty-only workaround).
+    # cast to a callable that accepts it.
     provider_class = cast(
         Callable[..., Provider[Any]], infer_provider_class(provider_name)
     )
@@ -82,20 +81,25 @@ def call_llm(
     user_prompt: str,
     model_settings: ModelSettings | None,
 ) -> Command | CannotHelp:
-    agent = Agent(
+    # Two spellings here are for the type checker, and neither changes behavior: the
+    # generic parameters are explicit (`object` is the default deps type, as Ape uses
+    # no deps), and `output_type` uses Pydantic AI's sequence form instead of
+    # `Command | CannotHelp`. ty reads a `X | Y` value as a `types.UnionType` instance,
+    # which matches neither `type[T]` nor the sequence arm of Pydantic AI's
+    # `OutputSpec`, so the union spelling matches no `Agent.__init__` overload and
+    # leaves the output typed `str`. The two forms build identical output tools, so
+    # the model sees the same schemas.
+    agent = Agent[object, Command | CannotHelp](
         # infer_model parses the provider from the `provider:name` prefix;
         # build_provider (with the key bound) constructs it with our APE_API_KEY.
         infer_model(model, provider_factory=partial(build_provider, api_key=api_key)),
         system_prompt=system_prompt,
-        output_type=Command | CannotHelp,
+        output_type=[Command, CannotHelp],
         # None means no settings are sent (see resolve_model_settings), so the model
         # uses its own defaults — needed for models that reject a temperature.
         model_settings=model_settings,
     )
-    # `output_type` makes the agent return a `Command | CannotHelp` at runtime, but
-    # the type checker (ty) doesn't resolve the union through pydantic-ai's overloads
-    # and infers `str`, so restate the type here. (Pyright resolves it without a cast.)
-    return cast(Command | CannotHelp, agent.run_sync(user_prompt).output)
+    return agent.run_sync(user_prompt).output
 
 
 def resolve_model() -> str:
