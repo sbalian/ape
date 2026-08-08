@@ -93,7 +93,11 @@ The flow in `ape_linux.py` is intentionally minimal:
    provider's standard credential env var. This stays provider-agnostic (any provider
    whose class accepts an `api_key` works with no provider-specific code); a provider
    that lacks an `api_key` parameter raises at call time and surfaces as a one-line
-   error. The model is resolved by `resolve_model()` solely from the **required**
+   error. `infer_provider_class` is typed as returning `type[Provider[Any]]` and the
+   abstract base declares no `__init__`, so the concrete keyword-only `api_key` is
+   erased and a cast is unavoidable here. It casts to the `KeyedProviderClass`
+   **protocol** rather than `Callable[..., Provider[Any]]` deliberately: the latter
+   accepts any arguments at all, so a misspelled keyword would type-check clean. The model is resolved by `resolve_model()` solely from the **required**
    `APE_MODEL` env var (in `provider:name` form); there is no built-in default and no
    CLI override, so the provider is always explicit — a missing/empty `APE_MODEL` exits
    `1` before any LLM call. The API key is resolved by `resolve_api_key()` from the

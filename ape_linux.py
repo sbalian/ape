@@ -4,9 +4,8 @@ import os
 import platform
 import shutil
 import sys
-from collections.abc import Callable
 from functools import partial
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 from pydantic import BaseModel
 from pydantic_ai import Agent, ModelSettings
@@ -53,6 +52,18 @@ class CannotHelp(BaseModel):
     reason: str
 
 
+class KeyedProviderClass(Protocol):
+    """A provider class that can be constructed from an API key alone.
+
+    Every key-based Pydantic AI provider has an ``__init__`` overload taking a
+    keyword-only ``api_key``, but ``infer_provider_class`` is typed as returning
+    ``type[Provider[Any]]`` and the abstract base declares no ``__init__``, so that
+    parameter is erased. ``build_provider`` casts to this protocol to restate it.
+    """
+
+    def __call__(self, *, api_key: str) -> Provider[Any]: ...
+
+
 def build_provider(provider_name: str, api_key: str) -> Provider[Any]:
     """Construct the Pydantic AI provider named by ``provider_name`` with ``api_key``.
 
@@ -66,11 +77,10 @@ def build_provider(provider_name: str, api_key: str) -> Provider[Any]:
     """
     # infer_provider_class returns the abstract base type[Provider], whose __init__
     # takes no arguments; the concrete `api_key` parameter lives on each subclass and
-    # is lost through the return type. Both ty and pyright reject the call without this
-    # cast to a callable that accepts it.
-    provider_class = cast(
-        Callable[..., Provider[Any]], infer_provider_class(provider_name)
-    )
+    # is lost through the return type. No spelling recovers it, so a cast is needed —
+    # but it is to KeyedProviderClass rather than `Callable[..., Provider[Any]]`, which
+    # would accept *any* arguments and so silently allow a misspelled keyword here.
+    provider_class = cast(KeyedProviderClass, infer_provider_class(provider_name))
     return provider_class(api_key=api_key)
 
 
