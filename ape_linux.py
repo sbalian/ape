@@ -7,6 +7,7 @@ import sys
 from functools import partial
 from typing import Any, Protocol, cast
 
+import pydantic_ai
 from pydantic import BaseModel
 from pydantic_ai import Agent, ModelSettings
 from pydantic_ai.exceptions import ModelHTTPError
@@ -94,12 +95,14 @@ def call_llm(
     # Pydantic AI shows a first-run banner (its logo plus an "observability: off" block)
     # on stderr the first time an agent runs in a terminal. Ape prints a single command
     # meant to be read or piped, so it owns its own output: turn the banner off before
-    # any run. This env var is Pydantic AI's documented switch for exactly that; its
-    # mere presence suppresses the banner, whatever the value. It is used in preference
-    # to the equivalent `pydantic_ai.BANNER_ENABLED = False` because that global is
-    # inferred as `Literal[True]` and so needs a `ty: ignore` to assign, and because
-    # the variable is simply unread on versions that predate the banner.
-    os.environ["PYDANTIC_AI_NO_BANNER"] = "1"
+    # any run. This is Pydantic AI's documented switch for exactly that. Pydantic AI
+    # declares it as a bare `BANNER_ENABLED = True` with no annotation, so ty infers
+    # the narrowest type, `Literal[True]`, and reads any assignment of `False` as a
+    # type error; the assignment is precisely what the attribute is documented for, so
+    # the diagnostic is suppressed rather than worked around. Assigning it is also a
+    # harmless no-op on versions that predate the banner, so the pydantic-ai-slim floor
+    # stays where it is.
+    pydantic_ai.BANNER_ENABLED = False  # ty: ignore[invalid-assignment]
 
     # Two spellings here are for the type checker, and neither changes behavior: the
     # generic parameters are explicit (`object` is the default deps type, as Ape uses

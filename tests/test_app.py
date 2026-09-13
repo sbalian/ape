@@ -3,6 +3,7 @@ import os
 import platform
 import socket
 
+import pydantic_ai
 import pytest
 from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.models.test import TestModel
@@ -258,16 +259,18 @@ def test_call_llm_returns_structured_output(monkeypatch):
     assert isinstance(result.command, str)
 
 
-def test_call_llm_suppresses_the_pydantic_ai_banner(monkeypatch):
+def test_call_llm_disables_the_pydantic_ai_banner(monkeypatch):
     # Pydantic AI shows a first-run banner on stderr, which would land next to ape's
-    # one-line output. call_llm suppresses it before the agent runs. delenv (recorded
-    # by monkeypatch, so the env is restored afterwards) makes the check meaningful.
-    monkeypatch.delenv("PYDANTIC_AI_NO_BANNER", raising=False)
+    # one-line output. call_llm turns it off before the agent runs. Setting the flag
+    # back to True first makes the check meaningful, and hands monkeypatch the global
+    # to restore afterwards; raising=False because versions predating the banner have
+    # no such attribute.
+    monkeypatch.setattr(pydantic_ai, "BANNER_ENABLED", True, raising=False)
     monkeypatch.setattr(
         "ape_linux.infer_model", lambda model, provider_factory: TestModel()
     )
     ape_linux.call_llm("openai:gpt-4.1", "key", "system", "user", None)
-    assert "PYDANTIC_AI_NO_BANNER" in os.environ
+    assert pydantic_ai.BANNER_ENABLED is False
 
 
 def test_build_provider_injects_key_without_standard_env_var(monkeypatch):
