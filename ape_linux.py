@@ -91,6 +91,16 @@ def call_llm(
     user_prompt: str,
     model_settings: ModelSettings | None,
 ) -> Command | CannotHelp:
+    # Pydantic AI shows a first-run banner (its logo plus an "observability: off" block)
+    # on stderr the first time an agent runs in a terminal. Ape prints a single command
+    # meant to be read or piped, so it owns its own output: turn the banner off before
+    # any run. This env var is Pydantic AI's documented switch for exactly that; its
+    # mere presence suppresses the banner, whatever the value. It is used in preference
+    # to the equivalent `pydantic_ai.BANNER_ENABLED = False` because that global is
+    # inferred as `Literal[True]` and so needs a `ty: ignore` to assign, and because
+    # the variable is simply unread on versions that predate the banner.
+    os.environ["PYDANTIC_AI_NO_BANNER"] = "1"
+
     # Two spellings here are for the type checker, and neither changes behavior: the
     # generic parameters are explicit (`object` is the default deps type, as Ape uses
     # no deps), and `output_type` uses Pydantic AI's sequence form instead of

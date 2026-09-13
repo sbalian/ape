@@ -110,7 +110,18 @@ The flow in `ape_linux.py` is intentionally minimal:
    yields `None` so **no** `model_settings` are sent — deliberately, because a
    hard-coded temperature crashes models that reject sampling settings (some reasoning
    models, Claude Opus 4.7/4.8) — and an unparseable value exits `1` before any LLM
-   call.
+   call. `call_llm()` also sets `PYDANTIC_AI_NO_BANNER=1` in `os.environ` before
+   building the agent: recent Pydantic AI versions print a first-run banner (logo plus
+   an "observability: off" block) to **stderr** on the first agent run in a terminal,
+   which would sit next to Ape's one-line command output. The env var is Pydantic AI's
+   documented switch for that — presence alone suppresses it — and is used in
+   preference to the equivalent `pydantic_ai.BANNER_ENABLED = False`, which ty infers
+   as `Literal[True]` and so cannot be assigned without a `ty: ignore`. Neither needs
+   a `pydantic-ai-slim` floor bump: the variable is simply unread on versions that
+   predate the banner. Note the banner is invisible to the test suite regardless —
+   Pydantic AI suppresses it whenever `PYTEST_VERSION`, `CI` or `PYDANTIC_AI_NO_BANNER`
+   is in the environment — so a regression here would only show up when a user runs
+   `ape` in a terminal.
 4. Errors are flattened to one-line stderr messages, raising `SystemExit(1)` —
    `ModelHTTPError` reports status/message; any other exception (bad credentials,
    unknown provider) prints `str(error)`. There is no CLI framework swallowing
@@ -132,6 +143,11 @@ stderr, exit `2`). The `mockenv` fixture sets a dummy `APE_API_KEY` and `APE_MOD
 `(model, api_key, system_prompt, user_prompt, model_settings)`; a missing **or
 blank/whitespace** `APE_MODEL` or `APE_API_KEY` is each checked to exit `1` before
 `call_llm` is ever reached.
+
+`test_call_llm_suppresses_the_pydantic_ai_banner` runs the real `call_llm` (with
+`TestModel` swapped in for `infer_model`) and asserts `PYDANTIC_AI_NO_BANNER` ends up
+in the environment. It calls `monkeypatch.delenv(..., raising=False)` first, so the
+check is meaningful and the environment is restored afterwards.
 
 `build_provider()` is covered directly (not through `main()`): tests construct the
 `openai` and `anthropic` providers with the standard credential vars deleted and assert
