@@ -7,6 +7,7 @@ import sys
 from functools import partial
 from typing import Any, Protocol, cast
 
+import pydantic_ai
 from pydantic import BaseModel
 from pydantic_ai import Agent, ModelSettings
 from pydantic_ai.exceptions import ModelHTTPError
@@ -91,6 +92,18 @@ def call_llm(
     user_prompt: str,
     model_settings: ModelSettings | None,
 ) -> Command | CannotHelp:
+    # Pydantic AI shows a first-run banner (its logo plus an "observability: off" block)
+    # on stderr the first time an agent runs in a terminal. Ape prints a single command
+    # meant to be read or piped, so it owns its own output: turn the banner off before
+    # any run. This is Pydantic AI's documented switch for exactly that. Pydantic AI
+    # declares it as a bare `BANNER_ENABLED = True` with no annotation, so ty infers
+    # the narrowest type, `Literal[True]`, and reads any assignment of `False` as a
+    # type error; the assignment is precisely what the attribute is documented for, so
+    # the diagnostic is suppressed rather than worked around. Assigning it is also a
+    # harmless no-op on versions that predate the banner, so the pydantic-ai-slim floor
+    # stays where it is.
+    pydantic_ai.BANNER_ENABLED = False  # ty: ignore[invalid-assignment]
+
     # Two spellings here are for the type checker, and neither changes behavior: the
     # generic parameters are explicit (`object` is the default deps type, as Ape uses
     # no deps), and `output_type` uses Pydantic AI's sequence form instead of

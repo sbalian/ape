@@ -3,6 +3,7 @@ import os
 import platform
 import socket
 
+import pydantic_ai
 import pytest
 from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.models.test import TestModel
@@ -256,6 +257,20 @@ def test_call_llm_returns_structured_output(monkeypatch):
     )
     assert isinstance(result, ape_linux.Command)
     assert isinstance(result.command, str)
+
+
+def test_call_llm_disables_the_pydantic_ai_banner(monkeypatch):
+    # Pydantic AI shows a first-run banner on stderr, which would land next to ape's
+    # one-line output. call_llm turns it off before the agent runs. Setting the flag
+    # back to True first makes the check meaningful, and hands monkeypatch the global
+    # to restore afterwards; raising=False because versions predating the banner have
+    # no such attribute.
+    monkeypatch.setattr(pydantic_ai, "BANNER_ENABLED", True, raising=False)
+    monkeypatch.setattr(
+        "ape_linux.infer_model", lambda model, provider_factory: TestModel()
+    )
+    ape_linux.call_llm("openai:gpt-4.1", "key", "system", "user", None)
+    assert pydantic_ai.BANNER_ENABLED is False
 
 
 def test_build_provider_injects_key_without_standard_env_var(monkeypatch):
